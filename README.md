@@ -58,7 +58,7 @@ To make it faster for you to run the code and functional simulation, the default
 Moreover, the python code also exports SystemVerilog testbench stimuli to `./hdl/tb/`.
 
 #  Functional Simulation & MiniZed Testing
-- Please download our [Example Vivado Project](hehe) and extracted under the `./vivado/` folder.
+- Please download our [Example Vivado Project](https://www.dropbox.com/s/0f40syakmydtln5/edgedrnn_minized.7z?dl=0) and extracted under the `./vivado/` folder.
 - Use Xilinx Vivado 2018.2
 - All the source files in the Vivado project are embedded inside the project folder to make sure it runs seemlessly on all machines. 
 If you update the source code, please make sure to update the Vivado project accordingly (overwrite source files inside the project folder. You can do this simply in Vivado GUI).
