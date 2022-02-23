@@ -45,7 +45,7 @@ pip install https://github.com/PyTorchLightning/pytorch-lightning/archive/master
 ```
 
 #  DeltaGRU Training
-DeltaGRU can be trained from scratch or by following a pretrain-retrain scheme. The code under `./python` shows how to train a DeltaGRU on AMPRO dataset using PyTorch Lightning and finally export the parameters of the network and SystemVerilog testbench stimuli. To run the code, navigate to `./python` in your terminal and run the following command:
+DeltaGRU can be trained from randomly initialized parameters or by following a pretrain(GRU)-retrain(DeltaGRU) scheme. The code under `./python` shows how to train a DeltaGRU on AMPRO dataset using PyTorch Lightning and finally export the parameters of the network and SystemVerilog testbench stimuli. To run the code, navigate to `./python` in your terminal and run the following command:
 ```
 conda activivate pt
 python main.py --step pretrain --run_through 1
