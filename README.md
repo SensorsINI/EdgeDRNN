@@ -9,11 +9,11 @@ This repo mainly contains:
 .
 └──  hdl                   # SystemVerilog HDL code of EdgeDRNN
     └── tb                 # Testbench and stimuli
-└── python                 # Pytorch Training Code
+└── python                 # PyTorch Training Code
     ├── data               # AMPRO Walking Dataset
-    ├── modules            # Pytorch Modules
-    ├── nnlayers           # Pytorch NN Layers
-    └── steps              # Pytorch training steps (Pretrain, Retrain, Export)
+    ├── modules            # PyTorch Modules
+    ├── nnlayers           # PyTorch NN Layers
+    └── steps              # PyTorch training steps (Pretrain, Retrain, Export)
 └── vivado                 # Xilinx Vivado Projects
     └── boardfile          # Boardfile for MiniZed (or add your own board here)
 ```
@@ -65,6 +65,6 @@ If you update the source code, please make sure to update the Vivado project acc
 - Before running the functional simulation, make sure to define `SIM_DEBUG` in `hdr_macros.v`.
 - Before synthesizing the code, make sure to remove the definition of `SIM_DEBUG` in `hdr_macros.v`. 
 - Before using Vivado, please install the MiniZed boardfile by following this [guide](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-sdk).
-- Before you connect the MiniZed board to your PC, make sure the [Xilinx Cable Drive](https://digilent.com/reference/programmable-logic/guides/install-cable-drivers) is correctly installed.
+- Before you connect the MiniZed board to your PC, make sure the [Xilinx Cable Driver](https://digilent.com/reference/programmable-logic/guides/install-cable-drivers) is correctly installed.
 - To launch the test programme on MiniZed, you need to open Xilinx SDK in Vivado from `File->Launch SDK`.
 - In Xilinx SDK, right click the project `edgedrnn_test` and click `Run As->Launch on Hardware (GDB)`.
