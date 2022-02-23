@@ -8,7 +8,7 @@ This repo mainly contains:
 ```
 .
 └──  hdl                   # SystemVerilog HDL code of EdgeDRNN
-    ├── tb                 # Testbench and stimuli
+    └── tb                 # Testbench and stimuli
 └── python                 # Pytorch Training Code
     ├── data               # AMPRO Walking Dataset
     ├── modules            # Pytorch Modules
