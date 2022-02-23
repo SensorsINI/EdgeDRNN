@@ -4,7 +4,7 @@ This repo mainly contains:
 - SystemVerilog HDL code of [EdgeDRNN](https://arxiv.org/abs/2012.13600)
 - Xilinx SDK Bare-Metal C code for controlling EdgeDRNN on AVNET [MiniZed](https://www.avnet.com/wps/portal/us/products/avnet-boards/avnet-board-families/minized/) 
 
-# Supported Dataset
+# Project Structure
 ```
 .
 └──  hdl                   # SystemVerilog HDL code of EdgeDRNN
