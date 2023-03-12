@@ -68,3 +68,20 @@ If you update the source code, please make sure to update the Vivado project acc
 - Before you connect the MiniZed board to your PC, make sure the [Xilinx Cable Driver](https://digilent.com/reference/programmable-logic/guides/install-cable-drivers) is correctly installed.
 - To launch the test programme on MiniZed, you need to open Xilinx SDK in Vivado from `File->Launch SDK`.
 - In Xilinx SDK, right click the project `edgedrnn_test` and click `Run As->Launch on Hardware (GDB)`.
+
+
+#  Reference
+If you find this repository helpful, please cite our work.
+- [JETCAS 2020] EdgeDRNN: Recurrent Neural Network Accelerator for Edge Inference (AICAS 2020 Best Paper)
+```
+@ARTICLE{Gao2020EdgeDRNN,
+  author={Gao, Chang and Rios-Navarro, Antonio and Chen, Xi and Liu, Shih-Chii and Delbruck, Tobi},
+  journal={IEEE Journal on Emerging and Selected Topics in Circuits and Systems}, 
+  title={EdgeDRNN: Recurrent Neural Network Accelerator for Edge Inference}, 
+  year={2020},
+  volume={10},
+  number={4},
+  pages={419-432},
+  doi={10.1109/JETCAS.2020.3040300}}
+
+```
