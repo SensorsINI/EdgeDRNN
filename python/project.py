@@ -27,9 +27,13 @@ class Project:
         args_basic.add_argument('--project_name', default='AMPRO', help='Useful for loggers like Comet')
         args_basic.add_argument('--step', default='pretrain', help='A specific step to run.')
         args_basic.add_argument('--run_through', default=1, type=int, help='If true, run all following steps.')
+        args_basic.add_argument('--accelerator', default='gpu', help='Supports passing different accelerator types ('
+                                                                     '“cpu”, “gpu”, “tpu”, “ipu”, “hpu”, “mps”, '
+                                                                     '“auto”) as well as custom accelerator instances.')
         args_basic.add_argument('--num_gpus', default=1, type=int,
-                                help='Number of gpus to use (Multi-GPU if larger than 1).')
-        args_basic.add_argument('--model_path', default='', help='Model path to load. If empty, the experiment key will be used.')
+                                help='Number of GPU nodes for distributed training.')
+        args_basic.add_argument('--model_path', default='', help='Model path to load. If empty, the experiment key '
+                                                                 'will be used.')
         # Dataset Processing/Feature Extraction
         args_feat = self.parser.add_argument_group("Dataset Processing/Feature Extraction")
         args_feat.add_argument('--normalize_features', default=1, type=int, help='If 1, normalize features')
@@ -39,7 +43,8 @@ class Project:
         args_hparam_t.add_argument('--epochs_pretrain', default=1, type=int, help='Number of epochs to train for.')
         args_hparam_t.add_argument('--epochs_retrain', default=1, type=int, help='Number of epochs to train for.')
         args_hparam_t.add_argument('--batch_size', default=128, type=int, help='Batch size.')
-        args_hparam_t.add_argument('--batch_size_test', default=256, type=int, help='Batch size for test. Use larger values for faster test.')
+        args_hparam_t.add_argument('--batch_size_test', default=256, type=int, help='Batch size for test. Use larger '
+                                                                                    'values for faster test.')
         args_hparam_t.add_argument('--lr', default=5e-4, type=float, help='Learning rate')  # 5e-4
         args_hparam_t.add_argument('--weight_decay', default=0.01, type=float, help='Weight decay')
         args_hparam_t.add_argument('--grad_clip_val', default=200, type=float, help='Gradient clipping')

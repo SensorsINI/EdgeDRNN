@@ -13,8 +13,8 @@ from project import Project
 
 
 def main(proj: Project):
-    # Reproducibility
-    proj.reproducible()
+    # Reproducibility (Disable for faster training)
+    # proj.reproducible()
 
     # Instantiate Dataloader
     dataloaders = DataLoader(proj)
@@ -29,9 +29,9 @@ def main(proj: Project):
     list_callbacks = proj.create_callbacks()
 
     # Trainer
-    trainer = pl.Trainer(max_epochs=proj.max_epochs, gpus=proj.num_gpus, logger=list_loggers,
+    trainer = pl.Trainer(max_epochs=proj.max_epochs, accelerator=proj.accelerator, num_nodes=proj.num_gpus, logger=list_loggers,
                          callbacks=list_callbacks, check_val_every_n_epoch=1, num_sanity_val_steps=0,
-                         gradient_clip_val=proj.grad_clip_val)
+                         gradient_clip_val=proj.grad_clip_val, precision='16-mixed')
 
     # Train
     trainer.fit(model=model,
