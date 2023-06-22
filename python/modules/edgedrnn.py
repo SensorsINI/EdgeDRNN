@@ -13,7 +13,7 @@ import torch
 import numpy as np
 from project import Project
 import modules.util as util
-from modules.dataloader import DataLoader
+from data.rachel.dataloader import DataLoader
 from scipy import io
 
 
@@ -114,7 +114,6 @@ class EdgeDRNN:
         test_stim = torch.cat(test_stim, dim=0)
         test_stim = test_stim[self.proj.stim_head:self.proj.stim_head + self.proj.stim_len, :]
         # If you want to plot the stimuli:
-        import matplotlib.pyplot as plt
         # x = np.arange(test_stimuli.shape[0])
         # y = test_stimuli
         # plt.plot(x, y)

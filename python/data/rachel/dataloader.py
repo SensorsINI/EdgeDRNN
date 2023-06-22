@@ -8,7 +8,7 @@ __email__ = "gaochangw@outlook.com"
 __status__ = "Prototype"
 
 from torch.utils import data
-from modules.dataset import AmproDataset
+from data.rachel.dataset import MyDataset
 from project import Project
 
 

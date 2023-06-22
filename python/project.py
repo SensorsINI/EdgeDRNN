@@ -7,6 +7,7 @@ __maintainer__ = "Chang Gao"
 __email__ = "gaochangw@outlook.com"
 __status__ = "Prototype"
 
+import importlib
 import os
 import typing
 import argparse
@@ -24,7 +25,8 @@ class Project:
         self.parser = argparse.ArgumentParser(description='Train a GRU network.')
         # Basic Setup
         args_basic = self.parser.add_argument_group("Basic Setup")
-        args_basic.add_argument('--project_name', default='AMPRO', help='Useful for loggers like Comet')
+        args_basic.add_argument('--dataset_name', default='gscdv2', help='Supported datasets are in /data')
+        args_basic.add_argument('--num_classes', default=12, type=int, help='Number of classes')
         args_basic.add_argument('--step', default='pretrain', help='A specific step to run.')
         args_basic.add_argument('--run_through', default=1, type=int, help='If true, run all following steps.')
         args_basic.add_argument('--accelerator', default='gpu', help='Supports passing different accelerator types ('
@@ -32,6 +34,8 @@ class Project:
                                                                      '“auto”) as well as custom accelerator instances.')
         args_basic.add_argument('--num_gpus', default=1, type=int,
                                 help='Number of GPU nodes for distributed training.')
+        args_basic.add_argument('--gpu_ids', default=4, nargs='+', type=int,
+                                help='Specify GPU IDs to use')
         args_basic.add_argument('--model_path', default='', help='Model path to load. If empty, the experiment key '
                                                                  'will be used.')
         # Dataset Processing/Feature Extraction
@@ -56,7 +60,8 @@ class Project:
         args_hparam_m = self.parser.add_argument_group("Model Hyperparameters")
 
         args_hparam_m.add_argument('--rnn_layers', default=2, type=int, help='Number of RNN nnlayers')
-        args_hparam_m.add_argument('--rnn_size', default=16, type=int, help='RNN Hidden layer size (must be a multiple of num_pe, see modules/edgedrnn.py)')
+        args_hparam_m.add_argument('--rnn_size', default=16, type=int,
+                                   help='RNN Hidden layer size (must be a multiple of num_pe, see modules/edgedrnn.py)')
         args_hparam_m.add_argument('--rnn_type_pretrain', default='GRU', help='RNN type for pretrain')
         args_hparam_m.add_argument('--rnn_type_retrain', default='DeltaGRU', help='RNN type for pretrain')
         args_hparam_m.add_argument('--rnn_dropout', default=0.5, type=float, help='RNN Hidden layer size')
@@ -101,23 +106,11 @@ class Project:
         for k, v in self.hparams.items():
             setattr(self, k, v)
 
+        # Datasets
+        self.prepare_dataset()
+
         # Define abbreviations of hparams
-        self.args_to_abb = {
-            'seed': 'S',
-            'inp_size': 'I',
-            'rnn_size': 'H',
-            'rnn_type': 'T',
-            'rnn_layers': 'L',
-            'num_classes': 'C',
-            'ctxt_size': 'CT',
-            'pred_size': 'PD',
-            'qa': 'QA',
-            'aqi': 'AQI',
-            'aqf': 'AQF',
-            'qw': 'QW',
-            'wqi': 'WQI',
-            'wqf': 'WQF',
-        }
+        self.args_to_abb = self.train_set.args_to_abb
         self.abb_to_args = dict((v, k) for k, v in self.args_to_abb.items())
         self.experiment_key = None
 
@@ -196,7 +189,7 @@ class Project:
         callback_best_model = ModelCheckpoint(
             monitor="val_loss",  # Monitor val_loss for saving the best models
             dirpath=os.path.join("save", self.step, self.experiment_key),
-            filename=self.project_name + "-{epoch:02d}-{val_loss:.4f}",
+            filename=self.dataset_name + "-{epoch:02d}-{val_loss:.4f}",
             save_top_k=1,  # Save the top-1 model
             mode="min",  # The lower the val_loss, the better the model
         )
@@ -207,14 +200,31 @@ class Project:
 
         return [callback_quantization, callback_best_model, lr_monitor]
 
+    def prepare_dataset(self):
+        # Create PyTorch Dataset
+        try:
+            mod_dataset = importlib.import_module('data.' + self.dataset_name + '.dataset')
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError('Please select a supported dataset or check your name spelling.')
+        setattr(self, "train_set", mod_dataset.MyDataset("training"))
+        setattr(self, "dev_set", mod_dataset.MyDataset("validation"))
+        setattr(self, "test_set", mod_dataset.MyDataset("testing"))
+
+    def prepare_dataloader(self):
+        try:
+            mod_dataloader = importlib.import_module('data.' + self.dataset_name + '.dataloader')
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError('Please select a supported dataset or check your name spelling.')
+        dataloaders = mod_dataloader.DataLoader(self)
+        return dataloaders
+
     def prepare_model(self):
         """
         Prepare the model to train
         """
-        from modules.model import Model
+        from models.rnn import Model
 
         # Instantiate Models
-
 
         # Method to select the best pretrained model
         def select_best_model(ckpt_paths: typing.List) -> str:

@@ -77,7 +77,7 @@ def collect_ampro_data(filepath, ctxt_size, pred_size):
     return ampro_test_sample, features, labels
 
 
-class AmproDataset(data.Dataset):
+class MyDataset(data.Dataset):
     def __init__(self, proj: Project, csv_paths: List, name: str, mean: float=None, std: float=None):
         """
         param name: 'train', 'dev' or 'test'
@@ -118,6 +118,22 @@ class AmproDataset(data.Dataset):
         self.data = ampro_data
         self.labels = ampro_labels
 
+        self.args_to_abb = {
+            'seed': 'S',
+            'rnn_size': 'H',
+            'rnn_type': 'T',
+            'rnn_layers': 'L',
+            'num_classes': 'C',
+            'ctxt_size': 'CT',
+            'pred_size': 'PD',
+            'qa': 'QA',
+            'aqi': 'AQI',
+            'aqf': 'AQF',
+            'qw': 'QW',
+            'wqi': 'WQI',
+            'wqf': 'WQF',
+        }
+
     def __len__(self):
         'Total number of samples'
         return self.data.size(0)  # The first dimention of the data tensor
@@ -128,3 +144,5 @@ class AmproDataset(data.Dataset):
         y = self.labels[idx, :]
 
         return X, y
+
+
