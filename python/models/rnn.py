@@ -139,7 +139,7 @@ class Model(pl.LightningModule):
 
     def compute_loss(self, batch):
         # features, labels = batch
-        waveforms, sample_rate, labels, speaker_id, utterance_number = batch
+        data, targets = batch
         out_cl, _ = self(waveforms)  # Executes self.forward()
         loss = F.l1_loss(out_cl, labels)
         return loss

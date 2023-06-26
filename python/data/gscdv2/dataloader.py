@@ -12,11 +12,11 @@ from torch.utils import data
 from project import Project
 
 
-def pad_sequence(batch):
-    # Make all tensor in a batch the same length by padding with zeros
-    batch = [item.t() for item in batch]
-    batch = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True, padding_value=0.)
-    return batch.permute(0, 2, 1)
+# def pad_sequence(batch):
+#     # Make all tensor in a batch the same length by padding with zeros
+#     batch = [item.t() for item in batch]
+#     batch = 
+#     return batch.permute(0, 2, 1)
 
 
 class MyCollator(object):
@@ -30,18 +30,18 @@ class MyCollator(object):
         # A data tuple has the form:
         # waveform, sample_rate, label, speaker_id, utterance_number
 
-        tensors, targets = [], []
+        data, targets = [], []
 
         # Gather in lists, and encode labels as indices
         for waveform, _, label, *_ in batch:
-            tensors += [waveform]
+            data += [torch.squeeze(waveform)]
             targets += [self.label_to_index(label)]
 
         # Group the list of tensors into a batched tensor
-        tensors = pad_sequence(tensors)
-        targets = torch.stack(targets)
+        data = torch.nn.utils.rnn.pad_sequence(data, batch_first=True, padding_value=0.) # Batch x T
+        targets = torch.stack(targets)  # Batch
 
-        return tensors, targets
+        return data, targets
 
     def label_to_index(self, word):
         # Return the position of the word in labels

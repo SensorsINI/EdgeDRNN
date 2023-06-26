@@ -1,5 +1,5 @@
 /python/logs/
 /python/save/
-/python/downloads/
+*downloads
 *.idea
 *__pycache__

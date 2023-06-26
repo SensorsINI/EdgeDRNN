@@ -9,11 +9,11 @@ __status__ = "Prototype"
 
 import os
 from torchaudio.datasets import SPEECHCOMMANDS
-# os.path.dirname(os.path.realpath(__file__))
+# 
 
 class MyDataset(SPEECHCOMMANDS):
     def __init__(self, subset: str = None):
-        super().__init__("./downloads", download=True)
+        super().__init__(os.path.join(os.path.dirname(os.path.realpath(__file__)), "./downloads"), download=True)
 
         def load_list(filename):
             filepath = os.path.join(self._path, filename)
@@ -28,6 +28,8 @@ class MyDataset(SPEECHCOMMANDS):
             excludes = load_list("validation_list.txt") + load_list("testing_list.txt")
             excludes = set(excludes)
             self._walker = [w for w in self._walker if w not in excludes]
+
+        _, self.sample_rate, _, _, _ = self.__getitem__(0)
 
         self.args_to_abb = {
             'seed': 'S',
