@@ -9,11 +9,11 @@ __status__ = "Prototype"
 
 import os
 from torchaudio.datasets import SPEECHCOMMANDS
-# 
+from project import Project
 
 class MyDataset(SPEECHCOMMANDS):
-    def __init__(self, subset: str = None):
-        super().__init__(os.path.join(os.path.dirname(os.path.realpath(__file__)), "./downloads"), download=True)
+    def __init__(self, proj: Project, subset: str = None):
+        super().__init__(os.path.dirname(os.path.realpath(__file__)), download=True)
 
         def load_list(filename):
             filepath = os.path.join(self._path, filename)

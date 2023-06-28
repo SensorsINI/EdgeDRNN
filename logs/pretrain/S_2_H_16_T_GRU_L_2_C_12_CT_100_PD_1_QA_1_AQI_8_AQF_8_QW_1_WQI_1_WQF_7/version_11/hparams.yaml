@@ -1,0 +1,89 @@
+accelerator: mps
+afqf: 4
+afqi: 2
+aqf: 8
+aqi: 8
+args: !!python/object:argparse.Namespace
+  accelerator: mps
+  afqf: 4
+  afqi: 2
+  aqf: 8
+  aqi: 8
+  batch_size: 128
+  batch_size_test: 256
+  cqf: 8
+  cqi: 6
+  ctxt_size: 100
+  dataset_name: gscdv2
+  epochs_pretrain: 1
+  epochs_retrain: 1
+  gpu_ids: 0
+  grad_clip_val: 200
+  lr: 0.0005
+  max_epochs: 1
+  model_path: ''
+  normalize_features: 1
+  num_classes: 12
+  num_gpus: 1
+  num_pe: 8
+  pred_size: 1
+  qa: 1
+  qaf: 1
+  qc: 1
+  qw: 1
+  rnn_dropout: 0.5
+  rnn_layers: 2
+  rnn_size: 16
+  rnn_type: GRU
+  rnn_type_pretrain: GRU
+  rnn_type_retrain: DeltaGRU
+  run_through: 1
+  seed: 2
+  step: pretrain
+  step_idx: 0
+  stim_head: 1000
+  stim_len: 1000
+  thh: 0.0
+  thx: 0.0
+  weight_decay: 0.01
+  wqf: 7
+  wqi: 1
+batch_size: 128
+batch_size_test: 256
+cqf: 8
+cqi: 6
+ctxt_size: 100
+dataset_name: gscdv2
+epochs_pretrain: 1
+epochs_retrain: 1
+gpu_ids: 0
+grad_clip_val: 200
+lr: 0.0005
+max_epochs: 1
+model_path: ''
+normalize_features: 1
+num_classes: 12
+num_gpus: 1
+num_pe: 8
+pred_size: 1
+qa: 1
+qaf: 1
+qc: 1
+qw: 1
+rnn_dropout: 0.5
+rnn_layers: 2
+rnn_size: 16
+rnn_type: GRU
+rnn_type_pretrain: GRU
+rnn_type_retrain: DeltaGRU
+run_through: 1
+seed: 2
+step: pretrain
+step_idx: 0
+stim_head: 1000
+stim_len: 1000
+thh: 0.0
+thx: 0.0
+weight_decay: 0.01
+wqf: 7
+wqi: 1

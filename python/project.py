@@ -29,12 +29,12 @@ class Project:
         args_basic.add_argument('--num_classes', default=12, type=int, help='Number of classes')
         args_basic.add_argument('--step', default='pretrain', help='A specific step to run.')
         args_basic.add_argument('--run_through', default=1, type=int, help='If true, run all following steps.')
-        args_basic.add_argument('--accelerator', default='gpu', help='Supports passing different accelerator types ('
+        args_basic.add_argument('--accelerator', default='mps', help='Supports passing different accelerator types ('
                                                                      '“cpu”, “gpu”, “tpu”, “ipu”, “hpu”, “mps”, '
                                                                      '“auto”) as well as custom accelerator instances.')
         args_basic.add_argument('--num_gpus', default=1, type=int,
                                 help='Number of GPU nodes for distributed training.')
-        args_basic.add_argument('--gpu_ids', default=4, nargs='+', type=int,
+        args_basic.add_argument('--gpu_ids', default=0, nargs='+', type=int,
                                 help='Specify GPU IDs to use')
         args_basic.add_argument('--model_path', default='', help='Model path to load. If empty, the experiment key '
                                                                  'will be used.')
@@ -206,9 +206,9 @@ class Project:
             mod_dataset = importlib.import_module('data.' + self.dataset_name + '.dataset')
         except ModuleNotFoundError:
             raise ModuleNotFoundError('Please select a supported dataset or check your name spelling.')
-        setattr(self, "train_set", mod_dataset.MyDataset("training"))
-        setattr(self, "dev_set", mod_dataset.MyDataset("validation"))
-        setattr(self, "test_set", mod_dataset.MyDataset("testing"))
+        setattr(self, "train_set", mod_dataset.MyDataset(self, "training"))
+        setattr(self, "dev_set", mod_dataset.MyDataset(self, "validation"))
+        setattr(self, "test_set", mod_dataset.MyDataset(self, "testing"))
 
     def prepare_dataloader(self):
         try:

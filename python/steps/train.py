@@ -29,16 +29,25 @@ def main(proj: Project):
     list_callbacks = proj.create_callbacks()
 
     # Trainer
-    trainer = pl.Trainer(max_epochs=proj.max_epochs,
-                         accelerator=proj.accelerator,
-                         devices=proj.gpu_ids,
-                         num_nodes=proj.num_gpus,
-                         logger=list_loggers,
-                         callbacks=list_callbacks,
-                         check_val_every_n_epoch=1,
-                         num_sanity_val_steps=0,
-                         gradient_clip_val=proj.grad_clip_val,
-                         precision='16-mixed')
+    if proj.accelerator == 'mps':
+        trainer = pl.Trainer(max_epochs=proj.max_epochs,
+                            accelerator='mps',
+                            logger=list_loggers,
+                            callbacks=list_callbacks,
+                            check_val_every_n_epoch=1,
+                            num_sanity_val_steps=0,
+                            gradient_clip_val=proj.grad_clip_val)
+    else:
+        trainer = pl.Trainer(max_epochs=proj.max_epochs,
+                            accelerator=proj.accelerator,
+                            devices=proj.gpu_ids,
+                            num_nodes=proj.num_gpus,
+                            logger=list_loggers,
+                            callbacks=list_callbacks,
+                            check_val_every_n_epoch=1,
+                            num_sanity_val_steps=0,
+                            gradient_clip_val=proj.grad_clip_val,
+                            precision='16-mixed')
 
     # Train
     trainer.fit(model=model,

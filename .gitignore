@@ -1,5 +1,5 @@
 /python/logs/
 /python/save/
-*downloads
+/python/data/gscdv2/SpeechCommands
 *.idea
 *__pycache__
