@@ -13,7 +13,6 @@ import torch
 import numpy as np
 from project import Project
 import modules.util as util
-from data.rachel.dataloader import DataLoader
 from scipy import io
 
 
@@ -31,6 +30,15 @@ class EdgeDRNN:
 
         # Prepare Dataloader (Force Batch-1)
         # proj.update_attr(key='batch_size_test', value=1)
+
+        # Create PyTorch Dataloader
+        try:
+            mod_dataset = importlib.import_module('data.' + self.dataset_name + '.dataset')
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError('Please select a supported dataset or check your name spelling.')
+        setattr(self, "train_set", mod_dataset.AmproDataset(self, "training"))
+        setattr(self, "dev_set", mod_dataset.AmproDataset(self, "validation"))
+        setattr(self, "test_set", mod_dataset.AmproDataset(self, "testing"))
         self.dataloaders = DataLoader(proj)
 
         # Load DeltaGRU Model
@@ -114,6 +122,7 @@ class EdgeDRNN:
         test_stim = torch.cat(test_stim, dim=0)
         test_stim = test_stim[self.proj.stim_head:self.proj.stim_head + self.proj.stim_len, :]
         # If you want to plot the stimuli:
+        import matplotlib.pyplot as plt
         # x = np.arange(test_stimuli.shape[0])
         # y = test_stimuli
         # plt.plot(x, y)

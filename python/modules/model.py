@@ -12,7 +12,7 @@ from torch import nn
 import torch.optim as optim
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from models.nnlayers.deltagru import DeltaGRU
+from nnlayers.deltagru import DeltaGRU
 import modules.util as util
 from project import Project
 
@@ -45,7 +45,7 @@ class Model(pl.LightningModule):
         # RNN
         self.rnn_type = self.rnn_type
         if self.rnn_type == 'GRU':
-            self.rnn = nn.GRU(input_size=3,
+            self.rnn = nn.GRU(input_size=self.inp_size,
                               hidden_size=self.rnn_size,
                               num_layers=self.rnn_layers,
                               bias=True,
@@ -138,9 +138,8 @@ class Model(pl.LightningModule):
         return qout_cl, out_rnn
 
     def compute_loss(self, batch):
-        # features, labels = batch
-        data, targets = batch
-        out_cl, _ = self(waveforms)  # Executes self.forward()
+        features, labels = batch
+        out_cl, _ = self(features)  # Executes self.forward()
         loss = F.l1_loss(out_cl, labels)
         return loss
 

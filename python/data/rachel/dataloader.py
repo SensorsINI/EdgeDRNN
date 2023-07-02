@@ -7,8 +7,9 @@ __maintainer__ = "Chang Gao"
 __email__ = "gaochangw@outlook.com"
 __status__ = "Prototype"
 
+import importlib
+
 from torch.utils import data
-from data.rachel.dataset import MyDataset
 from project import Project
 
 
@@ -18,21 +19,46 @@ class DataLoader:
         batch_size = proj.batch_size
         batch_size_test = proj.batch_size_test
 
-        # Split Dataset
-        csv_paths_train = ['./data/rachel_pd1.csv', './data/rachel_pd2.csv', './data/rachel_pd3.csv']
-        csv_paths_dev = ['./data/rachel_pd4.csv']
-        csv_paths_test = ['./data/rachel_pd5.csv']
-
         # Create PyTorch Dataset
-        train_set = AmproDataset(proj, csv_paths_train, 'train')
-        dev_set = AmproDataset(proj, csv_paths_dev, 'dev', train_set.mean, train_set.std)
-        test_set = AmproDataset(proj, csv_paths_test, 'test', train_set.mean, train_set.std)
+        try:
+            mod_dataset = importlib.import_module('data.' + proj.dataset_name + '.dataset')
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError('Please select a supported dataset or check your name spelling.')
+        setattr(self, "train_set", mod_dataset.AmproDataset(self, "training"))
+        setattr(self, "dev_set", mod_dataset.AmproDataset(self, "validation"))
+        setattr(self, "test_set", mod_dataset.AmproDataset(self, "testing"))
 
         # Create PyTorch dataloaders for train and dev set
-        num_workers = int(proj.num_cpu_threads / 4)
-        self.train_loader = data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True,
-                                            num_workers=num_workers)
-        self.dev_loader = data.DataLoader(dataset=dev_set, batch_size=batch_size_test, shuffle=False,
-                                          num_workers=num_workers)
-        self.test_loader = data.DataLoader(dataset=test_set, batch_size=batch_size_test, shuffle=False,
-                                           num_workers=num_workers)
+        if proj.accelerator == "gpu":
+            num_workers = int(proj.num_cpu_threads / 4)
+            pin_memory = True
+        else:
+            num_workers = 0
+            pin_memory = False
+
+        # Create PyTorch dataloaders for train and dev set
+        self.train_loader = data.DataLoader(
+            self.train_set,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+        )
+
+        self.dev_loader = data.DataLoader(
+            self.dev_set,
+            batch_size=batch_size_test,
+            shuffle=False,
+            drop_last=False,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+        )
+
+        self.test_loader = data.DataLoader(
+            self.test_set,
+            batch_size=batch_size_test,
+            shuffle=False,
+            drop_last=False,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+        )

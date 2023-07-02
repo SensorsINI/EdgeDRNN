@@ -77,16 +77,28 @@ def collect_ampro_data(filepath, ctxt_size, pred_size):
     return ampro_test_sample, features, labels
 
 
-class MyDataset(data.Dataset):
-    def __init__(self, proj: Project, csv_paths: List, name: str, mean: float=None, std: float=None):
+class AmproDataset(data.Dataset):
+    def __init__(self, proj: Project, subset: str):
         """
         param name: 'train', 'dev' or 'test'
         """
+        #csv_paths: List, name: str, mean: float=None, std: float=None
+        # Dataset Paths
+        csv_paths_train = ['./data/rachel/rachel_pd1.csv', './data/rachel/rachel_pd2.csv', './data/rachel/rachel_pd3.csv']
+        csv_paths_dev = ['./data/rachel/rachel_pd4.csv']
+        csv_paths_test = ['./data/rachel/rachel_pd5.csv']
+
         # Get Arguments
         ctxt_size = proj.ctxt_size
         pred_size = proj.pred_size
 
         # Process Data
+        if subset == 'training':
+            csv_paths = csv_paths_train
+        elif subset == 'validation':
+            csv_paths = csv_paths_dev
+        else:
+            csv_paths = csv_paths_test
         ampro_data = []
         ampro_labels = []
         for path in csv_paths:
@@ -102,14 +114,17 @@ class MyDataset(data.Dataset):
         ampro_data = torch.Tensor(ampro_data).float()
         ampro_labels = torch.Tensor(ampro_labels).float()
 
+        # Update Input size
+        proj.update_attr('inp_size', ampro_data.size(-1))
+
         # Normalize data
-        self.mean = torch.mean(ampro_data.reshape(ampro_data.size(0) * ampro_data.size(1), -1), 0)
-        self.std = torch.std(ampro_data.reshape(ampro_data.size(0) * ampro_data.size(1), -1), 0)
-        if proj.normalize_features:
-            if name == 'train':
-                ampro_data = (ampro_data - self.mean) / self.std
-            else:
-                ampro_data = (ampro_data - mean) / std
+        # self.mean = torch.mean(ampro_data.reshape(ampro_data.size(0) * ampro_data.size(1), -1), 0)
+        # self.std = torch.std(ampro_data.reshape(ampro_data.size(0) * ampro_data.size(1), -1), 0)
+        # if proj.normalize_features:
+        #     if subset == 'training':
+        #         ampro_data = (ampro_data - self.mean) / self.std
+        #     else:
+        #         ampro_data = (ampro_data - mean) / std
 
         # Update arguments
         proj.update_attr('inp_size', ampro_data.size(-1))
@@ -140,8 +155,8 @@ class MyDataset(data.Dataset):
 
     def __getitem__(self, idx):
         'Get one sample from the dataset using an index'
-        X = self.data[idx, :]
-        y = self.labels[idx, :]
+        X = self.data[idx, ...]
+        y = self.labels[idx, ...]
 
         return X, y
 

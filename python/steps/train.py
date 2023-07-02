@@ -7,16 +7,16 @@ __maintainer__ = "Chang Gao"
 __email__ = "gaochangw@outlook.com"
 __status__ = "Prototype"
 
-import importlib
 import pytorch_lightning as pl
+from data.rachel.dataloader import DataLoader
 from project import Project
 
 
 def main(proj: Project):
-    # Reproducibility (Disable for faster training)
-    # proj.reproducible()
+    # Reproducibility
+    proj.reproducible()
 
-    # Instantiate Dataloader (Dataset Dependent)
+    # Instantiate Dataloader
     dataloaders = proj.prepare_dataloader()
 
     # Model
@@ -29,25 +29,9 @@ def main(proj: Project):
     list_callbacks = proj.create_callbacks()
 
     # Trainer
-    if proj.accelerator == 'mps':
-        trainer = pl.Trainer(max_epochs=proj.max_epochs,
-                            accelerator='mps',
-                            logger=list_loggers,
-                            callbacks=list_callbacks,
-                            check_val_every_n_epoch=1,
-                            num_sanity_val_steps=0,
-                            gradient_clip_val=proj.grad_clip_val)
-    else:
-        trainer = pl.Trainer(max_epochs=proj.max_epochs,
-                            accelerator=proj.accelerator,
-                            devices=proj.gpu_ids,
-                            num_nodes=proj.num_gpus,
-                            logger=list_loggers,
-                            callbacks=list_callbacks,
-                            check_val_every_n_epoch=1,
-                            num_sanity_val_steps=0,
-                            gradient_clip_val=proj.grad_clip_val,
-                            precision='16-mixed')
+    trainer = pl.Trainer(max_epochs=proj.max_epochs, num_nodes=proj.num_gpus, logger=list_loggers,
+                         callbacks=list_callbacks, check_val_every_n_epoch=1, num_sanity_val_steps=0,
+                         gradient_clip_val=proj.grad_clip_val)
 
     # Train
     trainer.fit(model=model,
