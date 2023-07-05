@@ -291,6 +291,7 @@ class DeltaGRU(nn.Module):
             self.reset_log()
 
         # Reshape input if necessary
+        x = input
         if self.batch_first:
             x = input.transpose(0, 1)
         setattr(self, 'batch_size', int(x.size(1)))
@@ -301,28 +302,15 @@ class DeltaGRU(nn.Module):
         # self.set_qa_rt()
 
         # Initializers
-        init_input = torch.zeros(self.batch_size, self.x_p_size,
+        self.init_input = torch.zeros(self.batch_size, self.x_p_size,
                                  dtype=x.dtype, device=x.device)
-        init_state = torch.zeros(self.batch_size, self.hidden_size,
+        self.init_state = torch.zeros(self.batch_size, self.hidden_size,
                                  dtype=x.dtype, device=x.device)
-        init_gates = torch.zeros(self.batch_size, self.gate_size,
+        self.init_gates = torch.zeros(self.batch_size, self.gate_size,
                                  dtype=x.dtype, device=x.device)
         # Initialize States
         if state is None:  # state = (x_p, h_0, h_p, ma_0, mb_0)
-            state = []
-            for l in range(self.num_layers):
-                bias_ih = getattr(self, 'bias_ih_l{}'.format(l))
-                bias_hh = getattr(self, 'bias_hh_l{}'.format(l))
-                if self.deltagru_type == 'edgedrnn':  # To be compatible with EdgeDRNN
-                    init_ma = init_gates + bias_ih  # Only use bias_ih. bias_hh becomes a placeholder.
-                    init_mb = init_state
-                else:  # To match cuDNN GRU, use both bias_ih and bias_hh
-                    bias_ih_chunks = bias_ih.chunk(self.num_gates)
-                    bias_hh_chunks = bias_hh.chunk(self.num_gates)
-                    init_ma = init_gates + torch.cat(
-                        (bias_ih_chunks[0] + bias_hh_chunks[0], bias_ih_chunks[1] + bias_hh_chunks[1], bias_ih_chunks[2]))
-                    init_mb = init_state + bias_hh_chunks[2]
-                state.append((init_input, init_state, init_state, init_ma, init_mb))
+            state = self.initialze_state()
         else:
             state = []
             for l in range(self.num_layers):
@@ -350,6 +338,23 @@ class DeltaGRU(nn.Module):
 
 
         return x, state_next
+
+    def initialze_state(self):
+        state = []
+        for l in range(self.num_layers):
+            bias_ih = getattr(self, 'bias_ih_l{}'.format(l))
+            bias_hh = getattr(self, 'bias_hh_l{}'.format(l))
+            if self.deltagru_type == 'edgedrnn':  # To be compatible with EdgeDRNN
+                init_ma = self.init_gates + bias_ih  # Only use bias_ih. bias_hh becomes a placeholder.
+                init_mb = self.init_state
+            else:  # To match cuDNN GRU, use both bias_ih and bias_hh
+                bias_ih_chunks = bias_ih.chunk(self.num_gates)
+                bias_hh_chunks = bias_hh.chunk(self.num_gates)
+                init_ma = self.init_gates + torch.cat(
+                    (bias_ih_chunks[0] + bias_hh_chunks[0], bias_ih_chunks[1] + bias_hh_chunks[1], bias_ih_chunks[2]))
+                init_mb = self.init_state + bias_hh_chunks[2]
+            state.append((self.init_input, self.init_state, self.init_state, init_ma, init_mb))
+        return state
 
     def process_biases(self):
         # In default, we use the DeltaGRU equations in the EdgeDRNN paper

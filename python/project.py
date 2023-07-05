@@ -42,7 +42,7 @@ class Project:
         # Training Hyperparameters
         args_hparam_t = self.parser.add_argument_group("Training Hyperparameters")
         args_hparam_t.add_argument('--seed', default=2, type=int, help='Random seed.')
-        args_hparam_t.add_argument('--epochs_pretrain', default=10, type=int, help='Number of epochs to train for.')
+        args_hparam_t.add_argument('--epochs_pretrain', default=20, type=int, help='Number of epochs to train for.')
         args_hparam_t.add_argument('--epochs_retrain', default=2, type=int, help='Number of epochs to train for.')
         args_hparam_t.add_argument('--batch_size', default=16, type=int, help='Batch size.')
         args_hparam_t.add_argument('--batch_size_test', default=256, type=int, help='Batch size for test. Use larger values for faster test.')

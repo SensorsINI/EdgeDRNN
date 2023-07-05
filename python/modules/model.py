@@ -125,7 +125,7 @@ class Model(pl.LightningModule):
 
         # Classification Layer
         out_cl_acc = util.quantize_tensor(out_cl, self.accqi, self.accqf, self.qc)
-        # qout_cl = util.quantize_tensor(out_cl, self.cqi, self.cqf, qc)
+        qout_cl = util.quantize_tensor(out_cl, self.cqi, self.cqf, qc)
 
         if not self.training and self.rnn_type == 'DeltaGRU':
             dict_log_cl['cl_inp'] = out_rnn  # Classification Layer Input
@@ -145,7 +145,7 @@ class Model(pl.LightningModule):
         # if self.rnn_type == "DeltaGRU":
         #     self.list_debug = self.rnn.log
 
-        return out_cl, out_rnn
+        return qout_cl, out_rnn
 
     def compute_loss(self, batch):
         features, labels = batch
