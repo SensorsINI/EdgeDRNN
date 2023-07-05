@@ -68,7 +68,7 @@ class DeltaGRU(nn.Module):
         super(DeltaGRU, self).__init__()
 
         # Set type of DeltaGRU Implementation
-        self.deltagru_type = 'edgedrnn'  # Change it to 'cudnn' if you wang to match the cuDNN version used in PyTorch GRU
+        self.deltagru_type = 'edgedrnn'  # Change it to 'cudnn' if you want to match the cuDNN version used in PyTorch GRU
 
         # Properties
         self.input_size = input_size

@@ -18,6 +18,10 @@ from modules import util
 
 class Project:
     def __init__(self):
+        # Precision
+        torch.set_float32_matmul_precision('high')
+        torch.set_printoptions(precision=8)
+
         # Hardware Info
         self.num_cpu_threads = os.cpu_count()
 
@@ -25,9 +29,10 @@ class Project:
         self.parser = argparse.ArgumentParser(description='Train a GRU network.')
         # Basic Setup
         args_basic = self.parser.add_argument_group("Basic Setup")
-        args_basic.add_argument('--dataset_name', default='rachel', help='Useful for loggers like Comet')
+        args_basic.add_argument('--dataset_name', default='cps', help='Useful for loggers like Comet')
         args_basic.add_argument('--step', default='pretrain', help='A specific step to run.')
-        args_basic.add_argument('--run_through', default=1, type=int, help='If true, run all following steps.')
+        args_basic.add_argument('--run_through', default=0, type=int, help='If true, run all following steps.')
+        args_basic.add_argument('--accelerator', default='auto', help='Accelerator to use.')
         args_basic.add_argument('--num_gpus', default=1, type=int,
                                 help='Number of gpus to use (Multi-GPU if larger than 1).')
         args_basic.add_argument('--model_path', default='', help='Model path to load. If empty, the experiment key will be used.')
@@ -37,16 +42,16 @@ class Project:
         # Training Hyperparameters
         args_hparam_t = self.parser.add_argument_group("Training Hyperparameters")
         args_hparam_t.add_argument('--seed', default=2, type=int, help='Random seed.')
-        args_hparam_t.add_argument('--epochs_pretrain', default=1, type=int, help='Number of epochs to train for.')
-        args_hparam_t.add_argument('--epochs_retrain', default=1, type=int, help='Number of epochs to train for.')
-        args_hparam_t.add_argument('--batch_size', default=128, type=int, help='Batch size.')
+        args_hparam_t.add_argument('--epochs_pretrain', default=10, type=int, help='Number of epochs to train for.')
+        args_hparam_t.add_argument('--epochs_retrain', default=2, type=int, help='Number of epochs to train for.')
+        args_hparam_t.add_argument('--batch_size', default=16, type=int, help='Batch size.')
         args_hparam_t.add_argument('--batch_size_test', default=256, type=int, help='Batch size for test. Use larger values for faster test.')
-        args_hparam_t.add_argument('--lr', default=5e-4, type=float, help='Learning rate')  # 5e-4
+        args_hparam_t.add_argument('--lr', default=3e-4, type=float, help='Learning rate')  # 5e-4
         args_hparam_t.add_argument('--weight_decay', default=0.01, type=float, help='Weight decay')
         args_hparam_t.add_argument('--grad_clip_val', default=200, type=float, help='Gradient clipping')
-        args_hparam_t.add_argument('--ctxt_size', default=100, type=int,
+        args_hparam_t.add_argument('--ctxt_size', default=50, type=int,
                                    help='The number of timesteps for RNN to look at')
-        args_hparam_t.add_argument('--pred_size', default=1, type=int,
+        args_hparam_t.add_argument('--pred_size', default=0, type=int,
                                    help='The number of timesteps to predict in the future')
         # Model Hyperparameters
         args_hparam_m = self.parser.add_argument_group("Model Hyperparameters")
@@ -55,7 +60,7 @@ class Project:
         args_hparam_m.add_argument('--rnn_size', default=16, type=int, help='RNN Hidden layer size (must be a multiple of num_pe, see modules/edgedrnn.py)')
         args_hparam_m.add_argument('--rnn_type_pretrain', default='GRU', help='RNN type for pretrain')
         args_hparam_m.add_argument('--rnn_type_retrain', default='DeltaGRU', help='RNN type for pretrain')
-        args_hparam_m.add_argument('--rnn_dropout', default=0.5, type=float, help='RNN Hidden layer size')
+        args_hparam_m.add_argument('--rnn_dropout', default=0.1, type=float, help='RNN Hidden layer size')
         # Quantization
         args_hparam_q = self.parser.add_argument_group("Quantization Hyperparameters")
         args_hparam_q.add_argument('--qa', default=1, type=int, help='Quantize the activations')
@@ -75,7 +80,7 @@ class Project:
                                    help='Number of integer bits before decimal point for AF')
         args_hparam_q.add_argument('--afqf', default=4, type=int,
                                    help='Number of integer bits after decimal point for AF')
-        args_hparam_q.add_argument('--cqi', default=6, type=int,
+        args_hparam_q.add_argument('--cqi', default=8, type=int,
                                    help='Number of integer bits before decimal point for CL')
         args_hparam_q.add_argument('--cqf', default=8, type=int,
                                    help='Number of integer bits after decimal point for CL')
@@ -190,18 +195,23 @@ class Project:
 
         # Callback 2 - Save the best model at the lowest val_loss
         callback_best_model = ModelCheckpoint(
+            filename=self.dataset_name + "-{epoch:02d}-{val_loss:.4f}.pt",
             monitor="val_loss",  # Monitor val_loss for saving the best models
             dirpath=os.path.join("save", self.step, self.experiment_key),
-            filename=self.dataset_name + "-{epoch:02d}-{val_loss:.4f}",
             save_top_k=1,  # Save the top-1 model
             mode="min",  # The lower the val_loss, the better the model
+            save_weights_only=True
         )
 
         # Callback 3 - Learning Rate Monitor
         from pytorch_lightning.callbacks import LearningRateMonitor
         lr_monitor = LearningRateMonitor(logging_interval='step', log_momentum=True)
 
-        return [callback_quantization, callback_best_model, lr_monitor]
+        # Callback 4
+        from modules.callbacks import CustomLoggingCallback
+        logger = CustomLoggingCallback()
+
+        return [callback_quantization, callback_best_model, lr_monitor, logger]
 
     def prepare_dataloader(self):
         try:

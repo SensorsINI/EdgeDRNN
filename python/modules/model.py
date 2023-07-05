@@ -20,6 +20,13 @@ from project import Project
 # Definition of a neural network model
 class Model(pl.LightningModule):
     def __init__(self, args):
+        """
+        Args:
+            - qa, aqi, aqf, wqi, wqf, qaf, afqi, afqf
+            - inp_size, rnn_size, rnn_layers, rnn_dropout
+            - thx, thh
+            - num_classes
+        """
         super().__init__()
         # PyTorch-Lightning Automatic Optimization
         self.automatic_optimization = True
@@ -41,6 +48,9 @@ class Model(pl.LightningModule):
         self.list_debug = []
 
         # self.bn = nn.BatchNorm1d(cla_size)
+
+        # Loss
+        self.loss = torch.nn.MSELoss()
 
         # RNN
         self.rnn_type = self.rnn_type
@@ -115,12 +125,12 @@ class Model(pl.LightningModule):
 
         # Classification Layer
         out_cl_acc = util.quantize_tensor(out_cl, self.accqi, self.accqf, self.qc)
-        qout_cl = util.quantize_tensor(out_cl, self.cqi, self.cqf, qc)
+        # qout_cl = util.quantize_tensor(out_cl, self.cqi, self.cqf, qc)
 
         if not self.training and self.rnn_type == 'DeltaGRU':
             dict_log_cl['cl_inp'] = out_rnn  # Classification Layer Input
             dict_log_cl['cl_out'] = out_cl  # Classification Layer Output
-            dict_log_cl['cl_qout'] = qout_cl  # Output quantized to activation precision
+            # dict_log_cl['cl_qout'] = qout_cl  # Output quantized to activation precision
             dict_log_cl['cl_out_acc'] = out_cl_acc  # Output quantized to accumulation precision
             self.list_log = self.rnn.list_log
             self.list_log.append(dict_log_cl)
@@ -135,12 +145,12 @@ class Model(pl.LightningModule):
         # if self.rnn_type == "DeltaGRU":
         #     self.list_debug = self.rnn.log
 
-        return qout_cl, out_rnn
+        return out_cl, out_rnn
 
     def compute_loss(self, batch):
         features, labels = batch
         out_cl, _ = self(features)  # Executes self.forward()
-        loss = F.l1_loss(out_cl, labels)
+        loss = self.loss(out_cl, labels)
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -158,13 +168,13 @@ class Model(pl.LightningModule):
 
     def configure_optimizers(self):
         from torch.optim.lr_scheduler import ReduceLROnPlateau
-        # optimizer = optim.Adam(self.parameters(), amsgrad=False, lr=self.dict_args['lr'])
         optimizer = optim.AdamW(self.parameters(), lr=self.lr,
                                 amsgrad=False, weight_decay=self.weight_decay)
 
         lr_scheduler_config = {
-            "scheduler": ReduceLROnPlateau(optimizer=optimizer, mode='min'),
+            "scheduler": ReduceLROnPlateau(optimizer=optimizer, mode='min', factor=0.5, patience=0),
             "monitor": "val_loss",
+            "interval": "epoch",
             "frequency": 1
         }
 
@@ -206,7 +216,7 @@ class Model(pl.LightningModule):
         return self
 
     def load_deltagru_weight(self, model_path: str):
-        state_dict_loaded = torch.load(model_path)['state_dict']
+        state_dict_loaded = torch.load(model_path, map_location=torch.device('cpu'))['state_dict']
         with torch.no_grad():
             for name, param in self.named_parameters():
                 loaded_param = state_dict_loaded[name]

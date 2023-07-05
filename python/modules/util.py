@@ -105,16 +105,16 @@ def quantize_tensor(x: Tensor, qi: int, qf: int, enable: int = 0, use_floor: boo
         return x
     else:
         power = torch.tensor(float(2. ** qf), dtype=torch.float32)
-        clip_val = torch.tensor(float(2. ** (qi + qf - 1)), dtype=torch.float32)
+        clip_val = torch.tensor(float(2. ** (qi + qf - 1) - 1), dtype=torch.float32)
         if use_floor:
             value = GradPreserveFloor.apply(x * power)
         else:
             value = GradPreserveRound.apply(x * power)  # Round Half to Even
 
         value = torch.max(value, -clip_val)
-        value = torch.min(value, clip_val - 1)
+        value = torch.min(value, clip_val)
         # value = torch.clamp(value, -clip_val, clip_val - 1)  # saturation arithmetic
-        value = value / power
+        value = torch.div(value, power)
         return value
 
 def quantize_array(x, qi, qf, enable, unsigned=0):
@@ -346,7 +346,7 @@ def gen_xilinx_sdk_clib(dir_path, file_name, dict_params):
         if quantize:
             # Get variable type
             if 0 < bit_width <= 8:
-                var_type = 'char'
+                var_type = 'signed char'
                 num_aligned_bytes = 8
             elif 8 < bit_width <= 16:
                 var_type = 'short'

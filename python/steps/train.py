@@ -8,6 +8,8 @@ __email__ = "gaochangw@outlook.com"
 __status__ = "Prototype"
 
 import pytorch_lightning as pl
+import torch
+
 from data.rachel.dataloader import DataLoader
 from project import Project
 
@@ -29,8 +31,13 @@ def main(proj: Project):
     list_callbacks = proj.create_callbacks()
 
     # Trainer
-    trainer = pl.Trainer(max_epochs=proj.max_epochs, num_nodes=proj.num_gpus, logger=list_loggers,
-                         callbacks=list_callbacks, check_val_every_n_epoch=1, num_sanity_val_steps=0,
+    trainer = pl.Trainer(max_epochs=proj.max_epochs,
+                         num_nodes=proj.num_gpus,
+                         accelerator=proj.accelerator,
+                         logger=list_loggers,
+                         callbacks=list_callbacks,
+                         check_val_every_n_epoch=1,
+                         num_sanity_val_steps=0,
                          gradient_clip_val=proj.grad_clip_val)
 
     # Train

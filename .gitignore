@@ -3,3 +3,8 @@
 /python/data/gscdv2/SpeechCommands
 *.idea
 *__pycache__
+/python/data/cps/Train
+/python/data/cps/Test
+/python/data/cps/Validate
+/python/data/cps/CPS-17-02-2023-UpDown-Imitation
+/vivado/edgedrnn_minized

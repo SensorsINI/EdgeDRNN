@@ -7,6 +7,7 @@ __maintainer__ = "Chang Gao"
 __email__ = "gaochangw@outlook.com"
 __status__ = "Prototype"
 
+import importlib
 import os.path
 
 import torch
@@ -33,13 +34,10 @@ class EdgeDRNN:
 
         # Create PyTorch Dataloader
         try:
-            mod_dataset = importlib.import_module('data.' + self.dataset_name + '.dataset')
+            mod_dataloader = importlib.import_module('data.' + proj.dataset_name + '.dataloader')
         except ModuleNotFoundError:
             raise ModuleNotFoundError('Please select a supported dataset or check your name spelling.')
-        setattr(self, "train_set", mod_dataset.AmproDataset(self, "training"))
-        setattr(self, "dev_set", mod_dataset.AmproDataset(self, "validation"))
-        setattr(self, "test_set", mod_dataset.AmproDataset(self, "testing"))
-        self.dataloaders = DataLoader(proj)
+        self.dataloaders = mod_dataloader.DataLoader(proj)
 
         # Load DeltaGRU Model
         self.model = proj.prepare_model()
@@ -66,19 +64,21 @@ class EdgeDRNN:
         # Regroup parameters into rnn_weight, rnn_bias, fc_weight, fc_bias
         list_rnn_weight = []
         list_rnn_bias = []
-        list_fc_weight = []
-        list_fc_bias = []
         with torch.no_grad():
             for name, param in self.model.named_parameters():
+                param.data = util.quantize_tensor(param.data, self.proj.wqi, self.proj.wqf, self.proj.qw)
                 param_np = param.cpu().numpy()
                 if 'rnn' in name and 'weight' in name:
                     list_rnn_weight.append(param_np)
                 if 'rnn' in name and 'bias_ih' in name:
                     list_rnn_bias.append(np.reshape(param_np, (-1, 1)))
-                if 'fc' in name and 'weight' in name:
-                    list_fc_weight.append(param_np)
-                if 'fc' in name and 'bias' in name:
-                    list_fc_bias.append(param_np)
+                if 'cl' in name and 'weight' in name:
+                    self.cl_weight = param_np
+                if 'cl' in name and 'bias' in name:
+                    self.cl_bias = param_np
+                    if self.cl_bias.ndim == 1:
+                        self.cl_bias = np.expand_dims(self.cl_bias, axis=-1)
+
 
         # Concat RNN parameters for hardware mapping
         pad_len = int(self.proj.inp_size_hw - self.proj.inp_size)
@@ -96,6 +96,8 @@ class EdgeDRNN:
         # Generate C Libraries for ilinx SDK
         dict_params = {
             'rnn_param': (self.edgedrnn_params, 1, self.proj.wqi, self.proj.wqf, 'param', 16),
+            'cl_bias': (self.cl_bias, 1, self.proj.wqi, self.proj.wqf, 'param', 16),
+            'cl_weight': (self.cl_weight, 1, self.proj.wqi, self.proj.wqf, 'param', 16),
             'rnn_layers': (self.proj.rnn_layers, 0, 16, 0, 'const', 1),
             'inp_size': (self.proj.inp_size_hw, 0, 16, 0, 'const', 1),
             'rnn_size': (self.proj.rnn_size, 0, 16, 0, 'const', 1),
@@ -134,6 +136,8 @@ class EdgeDRNN:
             test_gold_fc, test_gold_rnn = self.model(test_stim)
             test_stim = np.squeeze(test_stim.numpy()).transpose()  # (feature, time)
             test_gold_fc = np.squeeze(test_gold_fc.numpy()).transpose()  # (feature, time)
+            if test_gold_fc.ndim == 1:
+                test_gold_fc = np.expand_dims(test_gold_fc, axis=0)
             test_gold_rnn = np.squeeze(test_gold_rnn.numpy()).transpose()  # (feature, time)
 
             # Get logged variables for debugging hardware
