@@ -39,6 +39,7 @@ class Model(pl.LightningModule):
         self.debug = 0
 
         # Statistics
+        self.statistics = {}
         self.abs_delta_hid = 0
         self.abs_std_delta_hid = 0
         self.all_layer_dx = []
@@ -60,22 +61,22 @@ class Model(pl.LightningModule):
                               num_layers=self.rnn_layers,
                               bias=True,
                               bidirectional=False,
-                              batch_first=True,
+                              batch_first=self.batch_first,
                               dropout=self.rnn_dropout)
         elif self.rnn_type == 'DeltaGRU':
             self.rnn = DeltaGRU(input_size=self.inp_size,
                                 hidden_size=self.rnn_size,
                                 num_layers=self.rnn_layers,
-                                batch_first=True,
+                                batch_first=self.batch_first,
                                 thx=self.thx,
                                 thh=self.thh,
                                 qa=self.qa,
-                                qaf=self.qaf,
+                                # qaf=self.qaf,
                                 aqi=self.aqi,
                                 aqf=self.aqf,
-                                afqi=self.afqi,
-                                afqf=self.afqf,
-                                eval_sp=1,
+                                nqi=self.afqi,
+                                nqf=self.afqf,
+                                # eval_sp=1,
                                 debug=0
                                 )
         self.cl = nn.Linear(in_features=self.rnn_size, out_features=self.num_classes, bias=True)
@@ -100,7 +101,7 @@ class Model(pl.LightningModule):
                     nn.init.orthogonal_(param[:self.rnn_size, :])
                     nn.init.orthogonal_(param[self.rnn_size:2*self.rnn_size, :])
                     nn.init.orthogonal_(param[2*self.rnn_size:3*self.rnn_size, :])
-            if 'fc' in name:
+            if 'cl' or 'fc' in name:
                 if 'weight' in name:
                     # nn.init.orthogonal_(param)
                     nn.init.xavier_uniform_(param)
@@ -117,10 +118,11 @@ class Model(pl.LightningModule):
         if self.rnn_type in ['GRU', 'LSTM']:
             self.rnn.flatten_parameters()
 
-        # print(self.rnn.bias_ih_l0)
-
         # Forward Propagation
-        out_rnn, _ = self.rnn(x)
+        if 'Delta' in self.rnn_type:
+            out_rnn, state, reg = self.rnn(x)
+        else:
+            out_rnn, state = self.rnn(x)
         out_cl = self.cl(out_rnn)
 
         # Classification Layer
@@ -172,7 +174,7 @@ class Model(pl.LightningModule):
                                 amsgrad=False, weight_decay=self.weight_decay)
 
         lr_scheduler_config = {
-            "scheduler": ReduceLROnPlateau(optimizer=optimizer, mode='min', factor=0.5, patience=0),
+            "scheduler": ReduceLROnPlateau(optimizer=optimizer, mode='min', factor=0.5, patience=5),
             "monitor": "val_loss",
             "interval": "epoch",
             "frequency": 1
@@ -205,7 +207,7 @@ class Model(pl.LightningModule):
                             )
 
     def load_gru_weight(self, model_path: str):
-        state_dict_loaded = torch.load(model_path)['state_dict']
+        state_dict_loaded = torch.load(model_path, map_location='cpu')['state_dict']
         with torch.no_grad():
             for name, param in self.named_parameters():
                 loaded_param = state_dict_loaded[name]
@@ -223,3 +225,16 @@ class Model(pl.LightningModule):
                 # setattr(self, name, loaded_param)
                 param.data = loaded_param.data.to(param.device)
         return self
+
+    def get_sparsity(self):
+        for name, module in self._modules.items():
+            self.statistics['SP_W_' + name.upper()] = util.get_layer_sparsity(module)
+        temporal_sparsity = self.rnn.get_temporal_sparsity()
+        self.statistics.update(temporal_sparsity)
+        return self.statistics
+
+    def get_model_size(self):
+        self.statistics['NUM_PARAMS'] = 0
+        for name, param in self.named_parameters():
+            self.statistics['NUM_PARAMS'] += param.data.numel()
+        return self.statistics['NUM_PARAMS']

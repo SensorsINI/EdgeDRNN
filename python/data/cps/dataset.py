@@ -95,6 +95,7 @@ class CPSDataset(data.Dataset):
         csv_paths_test = get_csv_file_paths(test_folder)
 
         # Get Arguments
+        self.batch_first = proj.batch_first
         ctxt_size = proj.ctxt_size
         pred_size = proj.pred_size
 
@@ -164,7 +165,8 @@ class CPSDataset(data.Dataset):
         'Get one sample from the dataset using an index'
         X = self.data[idx, ...]
         y = self.labels[idx, ...]
-
+        if not self.batch_first:
+            X = X.transpose(0, 1)
         return X, y
 
 

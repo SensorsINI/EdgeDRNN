@@ -3,14 +3,15 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
-from networks.nn_util import quantize_tensor, hardsigmoid
-
+from modules.util import quantize_tensor, hardsigmoid
+from typing import Tuple, Optional
 
 class DeltaGRU(nn.GRU):
     def __init__(self,
                  input_size=16,
                  hidden_size=256,
                  num_layers=2,
+                 batch_first=False,
                  thx=0,
                  thh=0,
                  qa=0,
@@ -31,6 +32,7 @@ class DeltaGRU(nn.GRU):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.batch_first = batch_first
         self.th_x = thx
         self.th_h = thh
         self.qa = qa
@@ -43,20 +45,44 @@ class DeltaGRU(nn.GRU):
         self.nqf = nqf
         self.bw_acc = bw_acc
         self.debug = debug
+        self.benchmark = False
         self.weight_ih_height = 3 * self.hidden_size  # Wih has 4 weight matrices stacked vertically
         self.weight_ih_width = self.input_size
         self.weight_hh_width = self.hidden_size
         self.use_hardsigmoid = use_hardsigmoid
         self.use_hardtanh = use_hardtanh
         self.x_p_length = max(self.input_size, self.hidden_size)
+        self.num_gates = 3
+
+        # Bias_nh
+        self.bias_nh = torch.zeros(1, requires_grad=False)
 
         # Statistics
         self.abs_sum_delta_hid = torch.zeros(1)
         self.sp_dx = 0
         self.sp_dh = 0
 
+        # Log for Debug
+        self.list_log = []
+        self.reset_log()
+
         # Debug
         self.set_debug(self.debug)
+
+    def reset_log(self):
+        setattr(self, 'list_log', [{} for i in range(self.num_layers)])
+
+    def log_var_append(self, l, key, var):
+        if not self.training and not self.benchmark:
+            if key not in self.list_log[l].keys():
+                self.list_log[l][key] = []
+            self.list_log[l][key].append(var.detach().cpu())
+
+    def log_var(self, l, key, var):
+        if not self.training and not self.benchmark:
+            if key not in self.list_log[l].keys():
+                self.list_log[l][key] = []
+            self.list_log[l][key] = var.detach().cpu()
 
     def set_debug(self, value):
         setattr(self, "debug", value)
@@ -108,65 +134,48 @@ class DeltaGRU(nn.GRU):
         self.statistics.update(temporal_sparsity)
         return temporal_sparsity
 
-    def process_inputs(self, x: Tensor, qa: int, x_p_0: Tensor = None, h_0: Tensor = None, h_p_0: Tensor = None,
-                       dm_ch_0: Tensor = None, dm_0: Tensor = None):
+    def initialize_state(self, x: Tensor):
         """
-        Process DeltaGRU Inputs (please refer to the DeltaGRU formulations)
+        Initialize DeltaGRU States Inputs (please refer to the DeltaGRU formulations)
         :param x:       x(t), Input Tensor
-        :param x_p_0:   x(t-1), Input Tensor
-        :param h_0:     h(t-1), Hidden state
-        :param h_p_0:   h(t-2), Hidden state
-        :param dm_ch_0: dm_ch(t-1), Delta Memory for next gate hidden MxV
-        :param dm_0:    dm(t-1), Delta Memory
-        :return: initialized state tensors
+        :return: state, which is a tuple of 5 Tensors:
+            (1) Tensor x_p_0:   x(t-1), Input Tensor
+            (2) Tensor h_0:     h(t-1), Hidden state
+            (3) Tensor h_p_0:   h(t-2), Hidden state
+            (4) Tensor dm_ch_0: dm_ch(t-1), Delta Memory for next gate hidden MxV
+            (5) Tensor dm_0:    dm(t-1), Delta Memory
         """
+        # Get Batch Size
+        batch_size = x.size(0) if self.batch_first else x.size(1)
 
-        # Reshape input if necessary
-        if self.batch_first:
-            x.transpose(0, 1)
-            setattr(self, 'batch_size', int(x.size()[0]))
-        else:
-            setattr(self, 'batch_size', int(x.size()[1]))
-        batch_size = x.size()[1]
-        x = quantize_tensor(x, self.aqi, self.aqf, qa)
+        # Generate zero state if external state not provided
+        x_p_0 = torch.zeros(self.num_layers, batch_size, self.x_p_length,
+                            dtype=x.dtype, device=x.device)
+        h_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
+        h_p_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
+        dm_nh_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
+        dm_0 = torch.zeros(self.num_layers, batch_size, self.weight_ih_height, dtype=x.dtype, device=x.device)
+        for l in range(self.num_layers):
+            bias_ih = getattr(self, 'bias_ih_l{}'.format(l))
+            dm_0[l, :, :self.hidden_size] = dm_0[l, :, :self.hidden_size] + bias_ih[:self.hidden_size]
+            dm_0[l, :, self.hidden_size:2 * self.hidden_size] = dm_0[l, :, self.hidden_size:2 * self.hidden_size] + bias_ih[self.hidden_size:2 * self.hidden_size]
+            dm_0[l, :, 2 * self.hidden_size:3 * self.hidden_size] = dm_0[l, :, 2 * self.hidden_size:3 * self.hidden_size] + bias_ih[2 * self.hidden_size:3 * self.hidden_size]
+            dm_nh_0[l, :, :] = dm_nh_0[l, :, :] + self.bias_nh.to(x.device)
+        state = (x_p_0, h_0, h_p_0, dm_nh_0, dm_0)
+        return state
 
-        if x_p_0 is None or h_0 is None or h_p_0 is None or dm_ch_0 is None or dm_0 is None:
-            # Generate zero state if external state not provided
-            x_p_0 = torch.zeros(self.num_layers, batch_size, self.x_p_length,
-                                dtype=x.dtype, device=x.device)
-            h_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
-            h_p_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
-            dm_ch_0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
-            dm_0 = torch.zeros(self.num_layers, batch_size, self.weight_ih_height, dtype=x.dtype, device=x.device)
-            for l in range(self.num_layers):
-                bias_ih = getattr(self, 'bias_ih_l{}'.format(l))
-                bias_hh = getattr(self, 'bias_hh_l{}'.format(l))
-                dm_0[l, :, :self.hidden_size] = quantize_tensor(dm_0[l, :, :self.hidden_size] +
-                                                                bias_ih[:self.hidden_size] +
-                                                                bias_hh[:self.hidden_size], self.wqi, self.wqf, self.qw)
-                dm_0[l, :, self.hidden_size:2 * self.hidden_size] = quantize_tensor(
-                    dm_0[l, :, self.hidden_size:2 * self.hidden_size] +
-                    bias_ih[self.hidden_size:2 * self.hidden_size] +
-                    bias_hh[self.hidden_size:2 * self.hidden_size], self.wqi, self.wqf,
-                    self.qw)
-                dm_0[l, :, 2 * self.hidden_size:3 * self.hidden_size] = quantize_tensor(
-                    dm_0[l, :, 2 * self.hidden_size:3 * self.hidden_size] +
-                    bias_ih[2 * self.hidden_size:3 * self.hidden_size], self.wqi,
-                    self.wqf,
-                    self.qw)
-                dm_ch_0[l, :, :] = quantize_tensor(
-                    dm_ch_0[l, :, :] +
-                    bias_hh[2 * self.hidden_size:3 * self.hidden_size], self.wqi,
-                    self.wqf,
-                    self.qw)
+    def layer_forward(self, input: Tensor, idx_layer: int, qa: int, state: Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]):
+        # Get States
+        x_p_0, h_0, h_p_0, dm_nh_0, dm_0 = state
+        x_p_0 = x_p_0[idx_layer]
+        h_0 = h_0[idx_layer]
+        h_p_0 = h_p_0[idx_layer]
+        dm_nh_0 = dm_nh_0[idx_layer]
+        dm_0 = dm_0[idx_layer]
 
-        return x, x_p_0, h_0, h_p_0, dm_ch_0, dm_0
-
-    def layer_forward(self, input: Tensor, l: int, qa: int, x_p_0: Tensor = None, h_0: Tensor = None,
-                      h_p_0: Tensor = None, dm_nh_0: Tensor = None, dm_0: Tensor = None):
         # Get Layer Parameters
-        weight_ih = getattr(self, 'weight_ih_l{}'.format(l))
-        weight_hh = getattr(self, 'weight_hh_l{}'.format(l))
+        weight_ih = getattr(self, 'weight_ih_l{}'.format(idx_layer))
+        weight_hh = getattr(self, 'weight_hh_l{}'.format(idx_layer))
 
         # Get Feature Dimension
         input_size = input.size(-1)
@@ -207,6 +216,10 @@ class DeltaGRU(nn.GRU):
             # Get Delta Vectors
             delta_x = x - x_p
             delta_h = h - h_p
+            self.log_var_append(idx_layer, 'pa_x', x)
+            self.log_var_append(idx_layer, 'pa_h_t-1', h)
+            self.log_var_append(idx_layer, 'pa_x_p', x_p)
+            self.log_var_append(idx_layer, 'pa_h_p', h_p)
 
             # Zero-out elements of delta vector below the threshold
             delta_x_abs = torch.abs(delta_x)
@@ -269,39 +282,88 @@ class DeltaGRU(nn.GRU):
             # Append current DeltaLSTM hidden output to the list
             output += [h]
 
+            # Log
+            self.log_var_append(idx_layer, 'pa_delta_x', delta_x)
+            self.log_var_append(idx_layer, 'pa_delta_h', delta_h)
+            self.log_var_append(idx_layer, 'pa_x_p_next', x_p)
+            self.log_var_append(idx_layer, 'pa_h_p_next', h_p)
+            self.log_var_append(idx_layer, 'pacc_m_r', dm_r)
+            self.log_var_append(idx_layer, 'pacc_m_u', dm_z)
+            self.log_var_append(idx_layer, 'pacc_m_cx', dm_n)
+            self.log_var_append(idx_layer, 'pacc_m_ch', dm_nh)
+            self.log_var_append(idx_layer, 'pa_q_m_ch', pre_act_nh)
+            self.log_var_append(idx_layer, 'pacc_ma', dm)
+            self.log_var_append(idx_layer, 'pacc_mb', dm_n)
+            self.log_var_append(idx_layer, 'pa_pre_r', pre_act_r)
+            self.log_var_append(idx_layer, 'pa_pre_u', pre_act_z)
+            self.log_var_append(idx_layer, 'pa_pre_c', pre_act_n)
+            # self.log_var_append(idx_layer, 'paa_r_times_q_m_ch', r_times_q_m_ch)
+            self.log_var_append(idx_layer, 'pa_r', gate_r)
+            self.log_var_append(idx_layer, 'pa_u', gate_z)
+            self.log_var_append(idx_layer, 'pa_c', gate_n)
+            self.log_var_append(idx_layer, 'pa_a', a)
+            self.log_var_append(idx_layer, 'pa_b', b)
+            self.log_var_append(idx_layer, 'pa_one_minus_u', one_minus_u)
+            # self.log_var_append(idx_layer, 'pa_a_plus_b', a_plus_b)
+            self.log_var_append(idx_layer, 'pa_h', h)
+
+        if not self.training and not self.benchmark:
+            for key in self.list_log[idx_layer]:
+                self.list_log[idx_layer][key] = torch.stack(self.list_log[idx_layer][key], dim=0)
+
+            # Log parameters
+            self.log_var(idx_layer, 'weight_ih', weight_ih)
+            self.log_var(idx_layer, 'weight_hh', weight_hh)
+            bias_ih = getattr(self, 'bias_ih_l{}'.format(idx_layer))
+            bias_hh = getattr(self, 'bias_hh_l{}'.format(idx_layer))
+            self.log_var(idx_layer, 'bias_ih', bias_ih)
+            self.log_var(idx_layer, 'bias_hh', bias_hh)
+
         output = torch.stack(output)
         x_p_out[:, :input_size] = x_p
-        return output, (x_p_out, h, h_p, dm_nh, dm), reg
+        state_next = (x_p_out, h, h_p, dm_nh, dm)
+        return output, state_next, reg
 
-    def forward(self, input: Tensor, x_p_0: Tensor = None, h_0: Tensor = None, h_p_0: Tensor = None,
-                dm_nh_0: Tensor = None, dm_0: Tensor = None):
+    def forward(self, input: Tensor, state: Optional[Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]] = None):
+        # Reset Log
+        if not self.training:
+            self.reset_log()
+
         # Quantize
         qa = 0 if self.training else self.qa
 
         # Initialize State
-        x, x_p_0, h_0, h_p_0, dm_nh_0, dm_0 = self.process_inputs(input, qa, x_p_0, h_0, h_p_0, dm_nh_0, dm_0)
+        if state is None:
+            state = self.initialize_state(input)
+
+        # Reshape input if necessary
+        x = input
+        if self.batch_first:  # Force x shape: (Time, Batch, Feature)
+            x = x.transpose(0, 1)
+        setattr(self, 'batch_size', int(x.size()[1]))
+        x = quantize_tensor(x, self.aqi, self.aqf, qa)
 
         # Iterate through layers
         reg = torch.zeros(1, dtype=x.dtype, device=input.device).squeeze()
         x_p_n = []
         h_n = []
         h_p_n = []
-        dm_nm_n = []
+        dm_nh_n = []
         dm_n = []
         for l in range(self.num_layers):
-            x, (x_p_n_l, h_n_l, h_p_n_l, dm_nh_n_l, dm_n_l), reg_l = self.layer_forward(x, l, qa, x_p_0[l], h_0[l],
-                                                                                        h_p_0[l], dm_nh_0[l], dm_0[l])
+            x, (x_p_n_l, h_n_l, h_p_n_l, dm_nh_n_l, dm_n_l), reg_l = self.layer_forward(x, l, qa, state)
             x_p_n.append(x_p_n_l)
             h_n.append(h_n_l)
             h_p_n.append(h_p_n_l)
-            dm_nm_n.append(dm_nh_n_l)
+            dm_nh_n.append(dm_nh_n_l)
             dm_n.append(dm_n_l)
             reg += reg_l
-        x_p_n = torch.stack(x_p_n)
-        h_n = torch.stack(h_n)
-        h_p_n = torch.stack(h_p_n)
-        dm_nm_n = torch.stack(dm_nm_n)
-        dm_n = torch.stack(dm_n)
+        x_p_n = torch.stack(x_p_n)  # Next h(t-1)
+        h_n = torch.stack(h_n)  # Next h(t-1)
+        h_p_n = torch.stack(h_p_n)  # Next h(t-2)
+        dm_nh_n = torch.stack(dm_nh_n)  # Next M_nh(t-1)
+        dm_n = torch.stack(dm_n)    # Next M(t-1)
+        state_next = (x_p_n, h_n, h_p_n, dm_nh_n, dm_n)
 
         # Debug
         if self.debug:
@@ -310,4 +372,23 @@ class DeltaGRU(nn.GRU):
             self.statistics["sparsity_to"] = float((self.statistics["num_dx_zeros"] + self.statistics["num_dh_zeros"]) /
                                                    (self.statistics["num_dx_numel"] + self.statistics["num_dh_numel"]))
 
-        return x, (x_p_n, h_n, h_p_n, dm_nm_n, dm_n), reg
+        if self.batch_first:
+            x = x.transpose(0, 1)
+        return x, state_next, reg
+
+    def process_biases(self):
+        # In default, we use the DeltaGRU equations in the EdgeDRNN paper
+        with torch.no_grad():
+            for l in range(self.num_layers):
+                bias_ih = getattr(self, 'bias_ih_l{}'.format(l))
+                bias_hh = getattr(self, 'bias_hh_l{}'.format(l))
+                bias_ih_chunks = bias_ih.chunk(self.num_gates)
+                bias_hh_chunks = bias_hh.chunk(self.num_gates)
+                bias_ih = torch.cat(
+                    (bias_ih_chunks[0] + bias_hh_chunks[0], bias_ih_chunks[1] + bias_hh_chunks[1],
+                     bias_ih_chunks[2]))
+                self.bias_nh = bias_hh_chunks[2].clone()
+                self.bias_nh.requires_grad = False
+                bias_hh = bias_hh.masked_fill_(bias_hh != 0, 0)
+                bias_hh.requires_grad = False
+

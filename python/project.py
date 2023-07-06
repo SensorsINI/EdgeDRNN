@@ -39,12 +39,13 @@ class Project:
         # Dataset Processing/Feature Extraction
         args_feat = self.parser.add_argument_group("Dataset Processing/Feature Extraction")
         args_feat.add_argument('--normalize_features', default=1, type=int, help='If 1, normalize features')
+        args_feat.add_argument('--batch_first', default=1, type=int, help='If 1, put batch dimension as dim 0 for features')
         # Training Hyperparameters
         args_hparam_t = self.parser.add_argument_group("Training Hyperparameters")
         args_hparam_t.add_argument('--seed', default=2, type=int, help='Random seed.')
         args_hparam_t.add_argument('--epochs_pretrain', default=20, type=int, help='Number of epochs to train for.')
         args_hparam_t.add_argument('--epochs_retrain', default=2, type=int, help='Number of epochs to train for.')
-        args_hparam_t.add_argument('--batch_size', default=16, type=int, help='Batch size.')
+        args_hparam_t.add_argument('--batch_size', default=128, type=int, help='Batch size.')
         args_hparam_t.add_argument('--batch_size_test', default=256, type=int, help='Batch size for test. Use larger values for faster test.')
         args_hparam_t.add_argument('--lr', default=3e-4, type=float, help='Learning rate')  # 5e-4
         args_hparam_t.add_argument('--weight_decay', default=0.01, type=float, help='Weight decay')
@@ -96,6 +97,7 @@ class Project:
         args_edgedrnn.add_argument('--stim_len', default=1000, type=int, help='#Timesteps of the HDL test stimuli')
 
         self.args = self.parser.parse_args()
+        self.args.batch_first = bool(self.args.batch_first)
 
         # Get Hyperparameter Dictionary
         self.hparams = vars(self.args)
