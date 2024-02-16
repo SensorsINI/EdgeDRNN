@@ -23,7 +23,7 @@ class Quantization(pl.Callback):
     def on_validation_epoch_start(self, trainer, pl_module):
         for name, param in pl_module.named_parameters():
             # Quantize Network
-            print("### Quantizing Parameter: " + name)
+            # print("### Quantizing Parameter: " + name)
             param.data = util.quantize_tensor(param.data, self.wqi, self.wqf, self.qw)
 
 

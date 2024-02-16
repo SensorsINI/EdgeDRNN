@@ -12,17 +12,17 @@ extern const signed char rnn_param[RNN_PARAM_SIZE] __attribute__ ((aligned (8)))
  * Var Type: NN Parameter Matrix 
  * Var Name: cl_bias
  * Bit Width: 8
- * Dimension: (1, 1)
+ * Dimension: (2, 1)
  */
-#define CL_BIAS_SIZE 1
+#define CL_BIAS_SIZE 2
 extern const signed char cl_bias[CL_BIAS_SIZE] __attribute__ ((aligned (8)));
 /*
  * Var Type: NN Parameter Matrix 
  * Var Name: cl_weight
  * Bit Width: 8
- * Dimension: (1, 16)
+ * Dimension: (2, 16)
  */
-#define CL_WEIGHT_SIZE 16
+#define CL_WEIGHT_SIZE 32
 extern const signed char cl_weight[CL_WEIGHT_SIZE] __attribute__ ((aligned (8)));
 #define RNN_LAYERS 2
 #define INP_SIZE 8
