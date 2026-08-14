@@ -1,25 +1,44 @@
+`default_nettype none
+
+/**
+ * Bit-exact hyperbolic-tangent lookup table used by the HPE.
+ *
+ * Paper Fig. 7 applies tanh() to the candidate-state path.  Both input and
+ * output use signed Q7.8: +256 represents +1.0 and -256 represents -1.0.
+ * Values beyond the exporter-generated table are saturated.  The exhaustive
+ * case statement is intentionally retained because it is the hardware copy
+ * of the quantized PyTorch activation and is therefore part of the numerical
+ * contract checked by the RTL regression.
+ */
 module tanh_lut #(
-   NUM_PE     = 1,
-   ACT_INT_BW = 8,
-   ACT_FRA_BW = 8
+   parameter int unsigned NUM_PE     = 1,
+   parameter int unsigned ACT_INT_BW = 8,
+   parameter int unsigned ACT_FRA_BW = 8
    )(
-   input  logic signed [NUM_PE-1:0][ACT_INT_BW+ACT_FRA_BW-1:0] in,
+   input  wire logic signed [NUM_PE-1:0][ACT_INT_BW+ACT_FRA_BW-1:0] in,
    output logic signed [NUM_PE-1:0][ACT_INT_BW+ACT_FRA_BW-1:0] out
    );
    
-   localparam ACT_BW = ACT_INT_BW + ACT_FRA_BW;
+   timeunit 1ns;
+   timeprecision 1ps;
+
+   localparam int unsigned ACT_BW = ACT_INT_BW + ACT_FRA_BW;
    logic signed [NUM_PE-1:0][ACT_BW-1:0] lut_in;
    logic signed [NUM_PE-1:0][ACT_BW-1:0] lut_out;
    
    assign out = lut_out;
 
+   // Preserve the exact expression sizing used to generate and validate this
+   // Q7.8 table; the apparent literal narrowing is intentional saturation.
+   /* verilator lint_off WIDTHTRUNC */
+   /* verilator lint_off WIDTHEXPAND */
    always_comb begin
       for (int unsigned i = 0; i < NUM_PE; i = i + 1) begin
          lut_out[i] = '0;
          lut_in[i] = in[i];
-         if ($signed(in[i]) > $signed(530)) begin // 2047
+         if ($signed(in[i]) > $signed(530)) begin
             lut_out[i] = $signed(256);
-         end else if ($signed(in[i]) < $signed(-530)) begin //-2048
+         end else if ($signed(in[i]) < $signed(-530)) begin
             lut_out[i] = $signed(-256);
          end else begin
             case($signed(lut_in[i]))
@@ -1089,5 +1108,17 @@ module tanh_lut #(
          end
       end
    end
+   /* verilator lint_on WIDTHEXPAND */
+   /* verilator lint_on WIDTHTRUNC */
    
+`ifndef SYNTHESIS
+   initial begin
+      assert (NUM_PE > 0) else $fatal(1, "NUM_PE must be positive");
+      assert (ACT_INT_BW == 8 && ACT_FRA_BW == 8)
+         else $fatal(1, "tanh_lut entries require the exported Q7.8 format");
+   end
+`endif
+
 endmodule
+
+`default_nettype wire

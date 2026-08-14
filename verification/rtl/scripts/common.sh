@@ -9,6 +9,7 @@ STIMULI_DIR="${STIMULI_DIR:-${VERIFY_ROOT}/stimuli}"
 BUILD_ROOT="${BUILD_ROOT:-${VERIFY_ROOT}/build}"
 
 RTL_SOURCES=(
+    "${REPO_ROOT}/hdl/edgedrnn_pkg.sv"
     "${REPO_ROOT}/hdl/axis_fifo.sv"
     "${REPO_ROOT}/hdl/bram_sdp.sv"
     "${REPO_ROOT}/hdl/mem_acc.sv"
@@ -22,8 +23,10 @@ RTL_SOURCES=(
 )
 
 TB_SOURCES=(
-    "${VERIFY_ROOT}/tb/gen_input.sv"
-    "${VERIFY_ROOT}/tb/gen_weight.sv"
+    "${VERIFY_ROOT}/tb/interfaces/axis_stream_if.sv"
+    "${VERIFY_ROOT}/tb/models/axis_file_source.sv"
+    "${VERIFY_ROOT}/tb/models/axi_datamover_read_model.sv"
+    "${VERIFY_ROOT}/tb/checkers/axis_stream_protocol_checker.sv"
     "${VERIFY_ROOT}/tb/edgedrnn_tb.sv"
 )
 

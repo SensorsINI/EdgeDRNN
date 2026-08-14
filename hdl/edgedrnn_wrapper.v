@@ -1,3 +1,12 @@
+/*
+ * Vivado block-design compatibility wrapper.
+ *
+ * This file contains no datapath logic: it exposes Verilog-2001 wire ports for
+ * older IP-packager projects and forwards them one-for-one to edgedrnn.sv.
+ * New SystemVerilog integrations may instantiate `edgedrnn` directly.  The
+ * generated AXI-Lite register-bank files are intentionally kept as plain
+ * Verilog because Vivado can regenerate them during IP packaging.
+ */
 module edgedrnn_wrapper #(
     parameter integer C_S_AXI_DATA_WIDTH = 32,
     parameter integer C_S_AXI_ADDR_WIDTH = 7,

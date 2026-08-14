@@ -1,6 +1,6 @@
 PYTHON ?= python
 
-.PHONY: install test-python train export pipeline rtl rtl-xsim rtl-verilator
+.PHONY: install test-python train export pipeline rtl rtl-lint rtl-xsim rtl-verilator
 
 install:
 	$(PYTHON) -m pip install -e .
@@ -18,7 +18,10 @@ pipeline:
 	$(PYTHON) python/main.py --step pretrain --run-through
 	$(MAKE) rtl
 
-rtl: rtl-xsim rtl-verilator
+rtl: rtl-lint rtl-xsim rtl-verilator
+
+rtl-lint:
+	./verification/rtl/scripts/run_verilator_lint.sh
 
 rtl-xsim:
 	./verification/rtl/scripts/run_xsim.sh

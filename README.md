@@ -10,6 +10,7 @@ network so the complete software-to-RTL flow can run quickly.
 ```text
 .
 ├── hdl/                         # Synthesizable SystemVerilog RTL
+├── docs/                        # Architecture and RTL reading guides
 ├── python/
 │   ├── edgedrnn/                # Native PyTorch package
 │   │   ├── layers/              # DeltaGRU and recurrent layers
@@ -88,6 +89,10 @@ remain accepted.
 The same fixed-size SystemVerilog testbench supports both AMD xsim and
 Verilator. It checks every response, fails with a nonzero status on a mismatch
 or timeout, and emits `RTL_TEST_PASS` only after all golden outputs match.
+It also inserts deterministic stream backpressure, checks every output TLAST,
+and runs portable AXI4-Stream stability assertions. For a beginner-oriented
+paper-to-code explanation, see
+[`docs/rtl_design_walkthrough.md`](docs/rtl_design_walkthrough.md).
 
 Run both simulators:
 
@@ -98,6 +103,7 @@ make rtl
 Run one simulator:
 
 ```bash
+make rtl-lint
 make rtl-xsim
 make rtl-verilator
 ```
@@ -109,7 +115,8 @@ The xsim script uses tools on `PATH`, then falls back to
 VIVADO_HOME=/tools/Xilinx/Vivado/2025.2 make rtl-xsim
 ```
 
-`VERILATOR`, `STIMULI_DIR`, and `BUILD_ROOT` can also be overridden. This makes
+`VERILATOR`, `VERILATOR_JOBS`, `STIMULI_DIR`, and `BUILD_ROOT` can also be
+overridden. This makes
 it possible to verify a temporary export without changing tracked vectors:
 
 ```bash
@@ -129,7 +136,9 @@ make pipeline
 - Download and extract the example Vivado project under `vivado/`.
 - Install the MiniZed board files for the Vivado version in use.
 - Copy updated synthesizable sources from `hdl/` into legacy embedded Vivado
-  projects that do not reference this repository directly.
+  projects that do not reference this repository directly. Compile
+  `edgedrnn_pkg.sv` before modules that import it; the verification file list in
+  `verification/rtl/scripts/common.sh` shows the supported source order.
 - Do not define `SIM_DEBUG` for synthesis. The verification scripts define it
   on the simulator command line, so `hdl/hdr_macros.v` remains synthesis-safe.
 - The bare-metal driver and generated parameter/test headers are under
