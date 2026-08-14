@@ -156,6 +156,8 @@ module edgedrnn #(
     logic                                 act_axis_tready;
     logic signed [NUM_PE-1:0][ACT_BW-1:0] act_axis_tdata ;
     logic                                 act_axis_tlast;
+    logic                                 out_axis_done_reg;
+    logic                                 fbk_axis_done_reg;
 
     //-----------------------
     //-- AXI Datamover CMD
@@ -297,20 +299,34 @@ module edgedrnn #(
     // HPC M_AXIS Interface
     always_comb begin
         if (ieu_hpc_curr_layer == num_layer) begin
-            m_out_axis_tvalid    = act_axis_tvalid;
+            m_out_axis_tvalid    = act_axis_tvalid & ~out_axis_done_reg;
             m_out_axis_tlast     = act_axis_tlast;
             m_out_axis_tdata     = pk_m_out_axis_tdata;
-            act_axis_tready = m_out_axis_tready & fbk_axis_tready;
+            act_axis_tready = (out_axis_done_reg | m_out_axis_tready) & (fbk_axis_done_reg | fbk_axis_tready);
         end else begin
             m_out_axis_tvalid    = '0;
             m_out_axis_tlast     = '0;
             m_out_axis_tdata     = '0;
-            act_axis_tready = fbk_axis_tready;
+            act_axis_tready = fbk_axis_done_reg | fbk_axis_tready;
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (!rst_n || (act_axis_tvalid & act_axis_tready)) begin
+            out_axis_done_reg <= 1'b0;
+            fbk_axis_done_reg <= 1'b0;
+        end else begin
+            if (m_out_axis_tvalid & m_out_axis_tready) begin
+                out_axis_done_reg <= 1'b1;
+            end
+            if (fbk_axis_tvalid & fbk_axis_tready) begin
+                fbk_axis_done_reg <= 1'b1;
+            end
         end
     end
 
     // IEU M_AXIS Interface
-    assign fbk_axis_tvalid = act_axis_tvalid & act_axis_tready;
+    assign fbk_axis_tvalid = act_axis_tvalid & ~fbk_axis_done_reg;
     assign fbk_axis_tdata = act_axis_tdata;
     assign fbk_axis_tlast = act_axis_tlast;
 
