@@ -130,6 +130,9 @@ module ieu #(
     logic nzl_s_tvalid;
     logic nzi_s_tvalid;
     logic nzl_s_tready;
+    logic nzl_pipe_tready;
+    logic nzl_pair_tvalid;
+    logic nzl_stage_tvalid;
     logic r_nzl_s_tlast;
     logic r1_nzl_s_tlast;
     logic nzl_s_tlast;
@@ -328,7 +331,7 @@ module ieu #(
             cnt_nzi <= '0;
         end else if (!rst_n_cnt_nzi_sw) begin
             cnt_nzi <= input_size;
-        end else if (item_valid & nzl_s_tready) begin
+        end else if (item_valid & nzl_pipe_tready) begin
             cnt_nzi <= cnt_nzi + 1;
         end
     end
@@ -338,7 +341,7 @@ module ieu #(
     always_ff @ (posedge clk) begin
         if (!rst_n | !rst_n_cnt_rd_item_idx) begin
             cnt_rd_item_idx <= '0;
-        end else if (item_valid & nzl_s_tready) begin
+        end else if (item_valid & nzl_pipe_tready) begin
             cnt_rd_item_idx <= cnt_rd_item_idx + 1;
         end
     end
@@ -349,7 +352,7 @@ module ieu #(
     always_ff @ (posedge clk) begin
         if (!rst_n | !rst_n_cnt_wr_item_idx) begin
             cnt_wr_item_idx <= '0;
-        end else if (r1_item_valid & nzl_s_tready) begin
+        end else if (r1_item_valid & nzl_pipe_tready) begin
             cnt_wr_item_idx <= cnt_wr_item_idx + 1;
         end
     end
@@ -392,7 +395,7 @@ module ieu #(
     // Delta Encoder Pipeline Level 0
     always_ff @ (posedge clk) begin
         
-        if (nzl_s_tready) begin
+        if (nzl_pipe_tready) begin
             r_en_de <= en_de;
         end
         
@@ -400,15 +403,15 @@ module ieu #(
             add_op0 <= '0;
             add_op1 <= '0;
             r_nzi   <= '0;
-        end else if (sel_de == 2'd0 && en_de && nzl_s_tready) begin
+        end else if (sel_de == 2'd0 && en_de && nzl_pipe_tready) begin
             add_op0 <= bias_act0[curr_layer];
             add_op1 <= bias_act1[curr_layer];
             r_nzi   <= cnt_addr_outer_offset;
-        end else if (sel_de == 2'd1 && en_de && nzl_s_tready) begin
+        end else if (sel_de == 2'd1 && en_de && nzl_pipe_tready) begin
             add_op0 <= s_mux_axis_tdata[cnt_rd_addr_batch];
             add_op1 <= mem_prev_dout[cnt_rd_addr_batch];
             r_nzi   <= cnt_nzi + layer_idx_offset + 1;
-        end else if (en_de && nzl_s_tready) begin
+        end else if (en_de && nzl_pipe_tready) begin
             add_op0 <= mem_curr_dout[cnt_rd_addr_batch];
             add_op1 <= mem_prev_dout[cnt_rd_addr_batch];
             r_nzi   <= cnt_nzi + layer_idx_offset + 1;
@@ -420,7 +423,7 @@ module ieu #(
             r_en_bias      <= '0;
             r_item_valid   <= '0;
             r_nzl_s_tlast <= '0;
-        end else if (en_de && nzl_s_tready) begin
+        end else if (en_de && nzl_pipe_tready) begin
             r_en_bias      <= en_bias;
             r_item_valid   <= item_valid;
             r_nzl_s_tlast <= nzl_s_tlast;
@@ -453,8 +456,11 @@ module ieu #(
     assign nzvl_s_tdata = r1_nzv;
     assign nzil_s_tdata = (r1_nzv == 0) ? 0 : r1_nzi;
 
-    assign nzl_s_tvalid = ((r1_nzv != 0 && nzl_s_tready && (r1_item_valid | r1_en_bias)) || r1_nzl_s_tlast == 1) ? 1'b1 : 1'b0;
-    assign nzi_s_tvalid = ((r1_nzv != 0 && nzl_s_tready && (r1_item_valid | r1_en_bias))) ? 1'b1 : 1'b0;
+    assign nzl_pair_tvalid = r1_nzv != 0 && (r1_item_valid | r1_en_bias);
+    assign nzl_stage_tvalid = nzl_pair_tvalid | r1_nzl_s_tlast;
+    assign nzl_s_tvalid = nzl_stage_tvalid & (~nzl_pair_tvalid | null_nzl_s_tready);
+    assign nzi_s_tvalid = nzl_pair_tvalid & nzl_s_tready;
+    assign nzl_pipe_tready = ~nzl_stage_tvalid | (nzl_s_tready & (~nzl_pair_tvalid | null_nzl_s_tready));
 
     always_ff @ (posedge clk) begin
         if (!rst_n) begin 
@@ -463,7 +469,7 @@ module ieu #(
             r1_en_bias     <= '0;
             r1_item_valid  <= '0;
             r1_nzl_s_tlast <= '0;
-        end else if (r_en_de & nzl_s_tready) begin
+        end else if (r_en_de & nzl_pipe_tready) begin
             r1_nzv         <= r_nzv;
             r1_nzi         <= r_nzi;
             r1_en_bias     <= r_en_bias;
@@ -535,7 +541,7 @@ module ieu #(
         en_cnt_addr_outer_offset = '0;
         prev_wr_addr_offset      = '0;
         prev_rd_addr_offset      = '0;
-        en_cnt_wr_addr           = (cnt_wr_addr_batch == NUM_PE-1 && nzl_s_tready == 1);
+        en_cnt_wr_addr           = (cnt_wr_addr_batch == NUM_PE-1 && nzl_pipe_tready == 1);
         en_cnt_rd_addr           = '0;
         mem_curr_wr_en           = '0;
         mem_curr_rd_en           = '0;
@@ -594,7 +600,7 @@ module ieu #(
             IEU_BIAS: //------------------------------------------------
             begin
             ieu_ns     = IEU_BIAS;
-            en_bias    = nzl_s_tready;
+            en_bias    = nzl_pipe_tready;
             en_de      = '1;
             mem_curr_l_rd_addr = cnt_layer - 2;
             
@@ -616,38 +622,38 @@ module ieu #(
             ieu_ns         = IEU_DX;
             en_de          = '1;
             sel_dth        = '0;
-            en_cnt_rd_addr = (cnt_rd_addr_batch == NUM_PE-2 && nzl_s_tready == 1);
-            en_cnt_wr_addr = (cnt_wr_addr_batch == NUM_PE-1 && nzl_s_tready == 1);
+            en_cnt_rd_addr = (cnt_rd_addr_batch == NUM_PE-2 && nzl_pipe_tready == 1);
+            en_cnt_wr_addr = (cnt_wr_addr_batch == NUM_PE-1 && nzl_pipe_tready == 1);
             mem_curr_l_rd_addr = cnt_layer - 2; // Input of current layer is the output from previous layer
             
             if (cnt_layer == 1) begin // First hidden layer
                 item_valid = s_mux_axis_tvalid;
                 sel_de = 1;
-                s_mux_axis_tready = (cnt_rd_addr_batch == NUM_PE-1 && nzl_s_tready == 1);
+                s_mux_axis_tready = (cnt_rd_addr_batch == NUM_PE-1 && nzl_pipe_tready == 1);
                 mem_prev_rd_en = s_mux_axis_tready;
             end else begin // Other hidden layers
                 item_valid = '1;
                 sel_de = 2;
-                mem_curr_rd_en = (cnt_rd_addr_batch == NUM_PE-1 && nzl_s_tready == 1);
+                mem_curr_rd_en = (cnt_rd_addr_batch == NUM_PE-1 && nzl_pipe_tready == 1);
                 mem_prev_rd_en = mem_curr_rd_en;
             end
             
-            if (cnt_rd_item_idx == r_input_size-1 && nzl_s_tready == 1) begin
+            if (cnt_rd_item_idx == r_input_size-1 && nzl_pipe_tready == 1) begin
                 nzl_s_tlast       = '1;
             //   en_nzi_valid      = '0;
             end
             
-            if (cnt_rd_item_idx >= r_input_size-1 && nzl_s_tready == 1) begin
+            if (cnt_rd_item_idx >= r_input_size-1 && nzl_pipe_tready == 1) begin
                 rst_n_cnt_addr_rd = '0;
                 mem_curr_rd_en    = '0;
                 mem_prev_rd_en    = '0;
             end
             
-            if (cnt_rd_item_idx > r_input_size-1 && nzl_s_tready == 1) begin
+            if (cnt_rd_item_idx > r_input_size-1 && nzl_pipe_tready == 1) begin
                 item_valid        = '0;
             end
             
-            if (cnt_wr_item_idx == r_input_size-1 && nzl_s_tready == 1) begin
+            if (cnt_wr_item_idx == r_input_size-1 && nzl_pipe_tready == 1) begin
                 ieu_ns  = IEU_DH;
                 sel_dth = '1;
                 rst_n_cnt_nzi_sw  = '0;
@@ -668,31 +674,31 @@ module ieu #(
             sel_dth             = '1;
             item_valid          = '1;
             sel_de              = 2;
-            en_de               = nzl_s_tready;
-            en_cnt_rd_addr      = (cnt_rd_addr_batch == NUM_PE-2 && nzl_s_tready == 1);
-            en_cnt_wr_addr      = (cnt_wr_addr_batch == NUM_PE-1 && nzl_s_tready == 1);
+            en_de               = nzl_pipe_tready;
+            en_cnt_rd_addr      = (cnt_rd_addr_batch == NUM_PE-2 && nzl_pipe_tready == 1);
+            en_cnt_wr_addr      = (cnt_wr_addr_batch == NUM_PE-1 && nzl_pipe_tready == 1);
             prev_rd_addr_offset = MEM_STATE_DEPTH;
             prev_wr_addr_offset = MEM_STATE_DEPTH;
             
-            mem_curr_rd_en      = (cnt_rd_addr_batch == NUM_PE-1 && nzl_s_tready == 1);
+            mem_curr_rd_en      = (cnt_rd_addr_batch == NUM_PE-1 && nzl_pipe_tready == 1);
             mem_prev_rd_en      = mem_curr_rd_en;
             
-            if (cnt_rd_item_idx == r_input_size + r_hidden_size-1 && nzl_s_tready == 1) begin
+            if (cnt_rd_item_idx == r_input_size + r_hidden_size-1 && nzl_pipe_tready == 1) begin
                 nzl_s_tlast              = '1;
                 en_cnt_addr_outer_offset = '1;
             end
             
-            if (cnt_rd_item_idx >= r_input_size + r_hidden_size-1 && nzl_s_tready == 1) begin
+            if (cnt_rd_item_idx >= r_input_size + r_hidden_size-1 && nzl_pipe_tready == 1) begin
                 rst_n_cnt_addr_rd        = '0;
                 mem_curr_rd_en           = '0;
                 mem_prev_rd_en           = '0;
             end
             
-            if (cnt_rd_item_idx > r_input_size + r_hidden_size-1 && nzl_s_tready == 1) begin
+            if (cnt_rd_item_idx > r_input_size + r_hidden_size-1 && nzl_pipe_tready == 1) begin
                 item_valid = '0;
             end
             
-            if (cnt_wr_item_idx == r_input_size + r_hidden_size-1 && nzl_s_tready == 1) begin
+            if (cnt_wr_item_idx == r_input_size + r_hidden_size-1 && nzl_pipe_tready == 1) begin
                 ieu_ns                   = IEU_FB;
                 rst_n_cnt_rd_item_idx    = '0;
                 rst_n_cnt_wr_item_idx    = '0;
@@ -741,10 +747,10 @@ module ieu #(
     end
 
     always_ff @ (posedge clk) begin
-        if (sel_de == 2'd1 & nzl_s_tready) begin
+        if (sel_de == 2'd1 & nzl_pipe_tready) begin
             r_mem_prev_din <= s_mux_axis_tdata;
             r1_mem_prev_din <= r_mem_prev_din;
-        end else if (item_valid & nzl_s_tready) begin
+        end else if (item_valid & nzl_pipe_tready) begin
             r_mem_prev_din <= mem_curr_dout;
             r1_mem_prev_din <= r_mem_prev_din;
         end
