@@ -1,6 +1,10 @@
+/artifacts/
 /python/logs/
 /python/save/
-/python/data/gscdv2/SpeechCommands
-*.idea
-*__pycache__
+/python/edgedrnn/datasets/gscdv2/SpeechCommands
+/verification/rtl/build/
 /vivado/edgedrnn_minized
+
+*.idea
+*.egg-info/
+*__pycache__

@@ -1,0 +1,28 @@
+{
+  "format_version": 1,
+  "model": {
+    "input_size": 8,
+    "num_pe": 8,
+    "rnn_layers": 2,
+    "rnn_size": 16,
+    "stimulus_timesteps": 1000
+  },
+  "files": {
+    "edgedrnn_tb_creg.txt": {
+      "entries": 32,
+      "sha256": "3265a51348c9817e1531f3febc372fb30b0904e1444455f7dd96df03b9f728e9"
+    },
+    "edgedrnn_tb_gold_rnn.txt": {
+      "entries": 2000,
+      "sha256": "57c6e7afbb02f0ba054e84220d4b179bbdf90b7155d74e448aa71eab30c3283c"
+    },
+    "edgedrnn_tb_params.txt": {
+      "entries": 348,
+      "sha256": "0b4133431eb637e7056f945a2706f8f1681e8f198cb2d758f1a5575956eb3b7b"
+    },
+    "edgedrnn_tb_stim.txt": {
+      "entries": 1000,
+      "sha256": "21a4ef465fecc3f16c7d604a9054065f02efb499adf1317212c29a5c129aa9e4"
+    }
+  }
+}

@@ -13,7 +13,8 @@ module edgedrnn #(
     parameter integer LAYER_SIZE_BW      = 10,  
     parameter integer DTH_BW             = 10,
     parameter integer NZI_BW             = 16,
-    parameter integer NZL_FIFO_DEPTH     = 32
+    parameter integer NZL_FIFO_DEPTH     = 32,
+    parameter CREG_FILE                  = "edgedrnn_tb_creg.txt"
     )(
     // Ports of Axi-Lite Slave Bus Interface S_AXI
     input  logic                              clk,
@@ -290,7 +291,6 @@ module edgedrnn #(
     assign cfg[30] = reg30;
     assign cfg[31] = reg31;
     `else  //--------------------------------------------------------
-    parameter CREG_FILE = "../../../../../../hdl/tb/edgedrnn_tb_creg.txt";
     initial begin
         $readmemh(CREG_FILE, cfg);
     end
