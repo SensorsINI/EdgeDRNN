@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edgedrnn"
+version = "1.0.0"
+description = "Native PyTorch training and RTL verification for EdgeDRNN"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "scipy>=1.13",
+    "torch>=2.6,<3",
+]
+
+[project.scripts]
+edgedrnn = "edgedrnn.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+
+[tool.setuptools.packages.find]
+where = ["python"]
+include = ["edgedrnn*"]
+
+[tool.setuptools.package-data]
+"edgedrnn.datasets.cps" = ["Train/*.csv", "Validate/*.csv", "Test/*.csv"]
