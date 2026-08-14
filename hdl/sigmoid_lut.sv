@@ -1,31 +1,47 @@
-//-----------------------------------------------------
-// Logistic Sigmoid LUT (Q7.8 INPUT & Q0.8 lut_outPUT)
-// Design Name : sigmoid_lut.sv
-// File Name   : sigmoid_lut.sv
-// 
-//-----------------------------------------------------
+`default_nettype none
+
+/**
+ * Bit-exact logistic-sigmoid lookup table used by the HPE.
+ *
+ * The activation pipeline in paper Fig. 7 evaluates the reset and update
+ * gates with sigmoid().  Hardware receives a signed Q7.8 value, uses that
+ * integer representation as the case-table address, and returns unsigned
+ * Q0.8 in the same 16-bit signed container.  For example, 256 represents
+ * 1.0.  Inputs outside the generated table saturate instead of wrapping.
+ *
+ * The individual entries are exporter-generated constants.  Keeping the
+ * table combinational makes its fixed-point behavior transparent and exactly
+ * reproducible in both software and RTL simulation.
+ */
 module sigmoid_lut #(
-   NUM_PE     = 1,
-   ACT_INT_BW = 8,
-   ACT_FRA_BW = 8
+   parameter int unsigned NUM_PE     = 1,
+   parameter int unsigned ACT_INT_BW = 8,
+   parameter int unsigned ACT_FRA_BW = 8
    )(
-   input  logic signed [NUM_PE-1:0][ACT_INT_BW+ACT_FRA_BW-1:0] in,
+   input  wire logic signed [NUM_PE-1:0][ACT_INT_BW+ACT_FRA_BW-1:0] in,
    output logic signed [NUM_PE-1:0][ACT_INT_BW+ACT_FRA_BW-1:0] out 
    );
    
-   localparam ACT_BW = ACT_INT_BW + ACT_FRA_BW;
+   timeunit 1ns;
+   timeprecision 1ps;
+
+   localparam int unsigned ACT_BW = ACT_INT_BW + ACT_FRA_BW;
    logic signed [NUM_PE-1:0][ACT_BW-1:0] lut_in;
    logic signed [NUM_PE-1:0][ACT_BW-1:0] lut_out;
    
    assign out = lut_out;
 
+   // These unsized literals intentionally preserve the exporter-validated
+   // SystemVerilog expression sizing.  The destination is the Q7.8 word.
+   /* verilator lint_off WIDTHTRUNC */
+   /* verilator lint_off WIDTHEXPAND */
    always_comb begin
       for (int unsigned i = 0; i < NUM_PE; i = i + 1) begin
          lut_out[i] = '0;
          lut_in[i] = in[i];
-         if ($signed(in[i]) > 879) begin // 2047
+         if ($signed(in[i]) > 879) begin
             lut_out[i] = $signed(256);
-         end else if ($signed(in[i]) < -879) begin //-2048
+         end else if ($signed(in[i]) < -879) begin
             lut_out[i] = $signed(0);
          end else begin
             case($signed(lut_in[i]))
@@ -1793,5 +1809,17 @@ module sigmoid_lut #(
          end
       end
    end
+   /* verilator lint_on WIDTHEXPAND */
+   /* verilator lint_on WIDTHTRUNC */
    
+`ifndef SYNTHESIS
+   initial begin
+      assert (NUM_PE > 0) else $fatal(1, "NUM_PE must be positive");
+      assert (ACT_INT_BW == 8 && ACT_FRA_BW == 8)
+         else $fatal(1, "sigmoid_lut entries require the exported Q7.8 format");
+   end
+`endif
+
 endmodule
+
+`default_nettype wire
